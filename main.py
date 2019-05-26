@@ -65,7 +65,7 @@ def runMainApp():
     #cherrypy.tools.auth = cherrypy.Tool('before_handler', auth.check_auth, 99)
 
     print("========================================")
-    print("             Hammond Pearce")
+    print("             Jason Yao")
     print("         University of Auckland")
     print("   COMPSYS302 - Example client web app")
     print("========================================")                       
