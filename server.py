@@ -64,6 +64,9 @@ class MainApp(object):
             cherrypy.session['username'] = username
             cherrypy.session['password'] = password
             pubAuth()
+            ping(username, password)
+            private_data = get_privatedata(username, password)
+            report(username, password)
             raise cherrypy.HTTPRedirect('/')
         else:
             raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
@@ -83,8 +86,8 @@ class MainApp(object):
 ### Functions only after here
 ###
 def pubAuth():
-    username = "jyao413" #cherrypy.session['username']    
-    password = "tigerj2_590856141" #cherrypy.session['password']
+    username = cherrypy.session['username'] #"jyao413"   
+    password = cherrypy.session['password']#"tigerj2_590856141" #
     url = "http://cs302.kiwi.land/api/add_pubkey"
 
 
@@ -144,8 +147,9 @@ def pubAuth():
     JSON_object = json.loads(data.decode(encoding))
     print(JSON_object)
     if (JSON_object["response"] == "ok"):
-        print("PUBKEY SUCC")
+        print("Successfully added a pubkey for user")
         cherrypy.session['signing_key'] = signing_key
+        cherrypy.session['pubkey'] = pubkey_hex_str
         return 0
     else:
         print ("Fail")
@@ -155,9 +159,102 @@ def pubAuth():
 
 def authoriseUserLogin(username, password):
     print("Log on attempt from {0}:{1}".format(username, password))
-    if (username.lower() == "jyao413") and (password.lower() == "tigerj2_590856141"):
+    if (username == "jyao413") and (password == "tigerj2_590856141"):
         print("Success")
         return 0
     else:
         print("Failure")
         return 1
+
+
+def ping(username, password):
+
+    url = "http://cs302.kiwi.land/api/ping"   
+    credentials = ('%s:%s' % (username, password))
+    b64_credentials = base64.b64encode(credentials.encode('ascii'))
+    headers = {
+        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
+        'Content-Type' : 'application/json; charset=utf-8',
+    }
+    payload = {
+        
+        "username" : username,
+        "pubkey" : cherrypy.session['pubkey']
+
+        
+    }
+    payload = json.dumps(payload).encode('utf-8')
+    try:
+        req = urllib.request.Request(url, data=payload, headers=headers)
+        response = urllib.request.urlopen(req)
+        data = response.read() # read the received bytes
+        encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
+        response.close()
+    except urllib.error.HTTPError as error:
+        print(error.read())
+        exit()
+
+    JSON_object = json.loads(data.decode(encoding))
+    print(JSON_object)
+    if (JSON_object["response"] == "ok"):
+        print("Ping success")
+        return 0
+    else:
+        print ("Fail")
+        return 1
+
+
+def get_privatedata(username, password):
+
+    url = "http://cs302.kiwi.land/api/get_privatedata"
+
+    #create HTTP BASIC authorization header
+    credentials = ('%s:%s' % (username, password))
+    b64_credentials = base64.b64encode(credentials.encode('ascii'))
+    headers = {
+        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
+        'Content-Type' : 'application/json; charset=utf-8',
+    }
+    try:
+        req = urllib.request.Request(url,  headers=headers)
+        response = urllib.request.urlopen(req)
+        data = response.read() # read the received bytes
+        encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
+        response.close()
+    except urllib.error.HTTPError as error:
+        print(error.read())
+        exit()
+
+    JSON_object = json.loads(data.decode(encoding))
+    print(JSON_object)
+    return JSON_object
+
+def report(username, password):
+    url = "http://cs302.kiwi.land/api/report"
+    credentials = ('%s:%s' % (username, password))
+    b64_credentials = base64.b64encode(credentials.encode('ascii'))
+    headers = {
+        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
+        'Content-Type' : 'application/json; charset=utf-8',
+    }
+
+    payload = {
+        "incoming_pubkey" : cherrypy.session['pubkey'],
+        "connection_address" : "127.0.0.1:8000",
+        "connection_location" : "2"
+        
+    }
+    payload = json.dumps(payload).encode('utf-8')
+    try:
+        req = urllib.request.Request(url, data=payload, headers=headers)
+        response = urllib.request.urlopen(req)
+        data = response.read() # read the received bytes
+        encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
+        response.close()
+    except urllib.error.HTTPError as error:
+        print(error.read())
+        exit()
+
+    JSON_object = json.loads(data.decode(encoding))
+    print(JSON_object)
+    return JSON_object

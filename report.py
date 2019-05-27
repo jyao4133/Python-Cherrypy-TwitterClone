@@ -29,12 +29,7 @@ verify_key_hex = verify_key.encode(encoder=nacl.encoding.HexEncoder)
 pubkey_hex = signing_key.verify_key.encode(encoder=nacl.encoding.HexEncoder)
 pubkey_hex_str = pubkey_hex.decode('utf-8')
 
-message_bytes = bytes(pubkey_hex_str + message + str(ts), encoding='utf-8')
 
-signed = signing_key.sign(message_bytes, encoder=nacl.encoding.HexEncoder)
-signature_hex_str = signed.signature.decode('utf-8')
-
-record = "jyao413,e9d1bb631a5acb9711fb2ea6bbf18e57c1088ae1792276e93bdff7c788010092," + str(ts) + "," + signature_hex_str	
 
 
 #create HTTP BASIC authorization header
