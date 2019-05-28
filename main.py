@@ -18,7 +18,7 @@ import server
 
 # The address we listen for connections on
 LISTEN_IP = "0.0.0.0"
-LISTEN_PORT = 1234
+LISTEN_PORT = 1233
 
 def runMainApp():
     #set up the config

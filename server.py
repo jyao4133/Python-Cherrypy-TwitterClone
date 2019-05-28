@@ -58,15 +58,19 @@ class MainApp(object):
     @cherrypy.expose
     def signin(self, username=None, password=None):
         """Check their name and password and send them either to the main page, or back to the main login screen."""
+        cherrypy.session['username'] = username
+        cherrypy.session['password'] = password
+        check_key(username, password)
         error = authoriseUserLogin(username, password)
 
         if error == 0:
-            cherrypy.session['username'] = username
-            cherrypy.session['password'] = password
-            pubAuth()
-            ping(username, password)
-            private_data = get_privatedata(username, password)
-            report(username, password)
+
+
+            response = ping(username, password)
+            if(response["response"] == "ok"):
+                report(username, password)
+            else:
+                raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
             raise cherrypy.HTTPRedirect('/')
         else:
             raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
@@ -180,6 +184,8 @@ def ping(username, password):
     payload = {
         
         "username" : username,
+        "pubkey" : cherrypy.session['pubkey'],
+        "Signature" : cherrypy.session['signed_key']
 
         
     }
@@ -258,3 +264,24 @@ def report(username, password):
     JSON_object = json.loads(data.decode(encoding))
     print(JSON_object)
     return JSON_object
+
+def check_key(username, password):
+
+    private_data = get_privatedata(username, password)
+    private_data_dict = json.loads(private_data['privatedata'])
+    if (private_data_dict['prikeys'] == ""):
+        pubAuth()
+    else:
+        cherrypy.session['privatekey'] = private_data_dict['prikeys']
+        print(cherrypy.session['privatekey'])
+                #decode private signing key
+        hex_key = bytes(cherrypy.session['privatekey'] , 'utf-8')
+        hex_key_str = cherrypy.session['privatekey']
+        signing_key = nacl.signing.SigningKey(hex_key, encoder=nacl.encoding.HexEncoder)
+        verify_key = signing_key.verify_key
+        verify_key_hex = verify_key.encode(encoder=nacl.encoding.HexEncoder)
+        pubkey_hex = signing_key.verify_key.encode(encoder=nacl.encoding.HexEncoder)
+        pubkey_hex_strs = pubkey_hex.decode('utf-8')
+        cherrypy.session['pubkey'] = pubkey_hex_strs
+        cherrypy.session['signed_key'] = hex_key_str
+            

@@ -15,8 +15,8 @@ import time
 #STUDENT TO UPDATE THESE...
 username = "jyao413"
 password = "tigerj2_590856141"
-hex_key = b'37704bcd1690cf848dbca707b02a2b85a918d214785cb8c4b9b1de54faa78d1b'
-prikeys = ""
+hex_key = b'8cdc1fbb0a2ba92452211c6ffb1b481eaa41024d261d50669b6ebe204a4108f0'
+prikeys = "8cdc1fbb0a2ba92452211c6ffb1b481eaa41024d261d50669b6ebe204a4108f0"
 blocked_pubkeys = ""
 blocked_usernames = "tigerj2"
 blocked_message_signatures = ""
@@ -39,7 +39,7 @@ private_data = json.dumps(private_datas)
 # Generate a new random signing key
 #hex_key = nacl.signing.SigningKey.generate().encode(encoder=nacl.encoding.HexEncoder)
 signing_key = nacl.signing.SigningKey(hex_key, encoder=nacl.encoding.HexEncoder)
-print(hex_key)
+print(signing_key)
 
 
 # Sign a message with the signing key
@@ -49,7 +49,7 @@ verify_key = signing_key.verify_key
 
 # Serialize the verify key to send it to a third party
 verify_key_hex = verify_key.encode(encoder=nacl.encoding.HexEncoder)
-record = "jyao413,e9d1bb631a5acb9711fb2ea6bbf18e57c1088ae1792276e93bdff7c788010092,1558399771.978730,7ae5bd41a8f14f711ea30f3b2303269c30df452537c3a732317d4e9950d847e046f0d0bf9613759cd328b11314324098549515fe630c1ae9c5d95c6a27f5300a"	
+record = "jyao413,4b5ea91f12203c5c8a140d3fac1971799daadb9b8496063ac52b278c0862a9f8,1559047970.3463073,3bea956cbffab35b6e183653a9bf70c7daba8af2497ea4ad111d907bb1db8ee8fb4113c7292aadb1a1a47e6e263e30b9c88e02d4f52be0b08636c3cc92e13207"	
 
 pubkey_hex = signing_key.verify_key.encode(encoder=nacl.encoding.HexEncoder)
 pubkey_hex_str = pubkey_hex.decode('utf-8')
