@@ -25,7 +25,17 @@ favourite_message_signatures = ""
 friends_usernames = ""
 ts = str(time.time())
 
-private_data = prikeys + blocked_pubkeys + blocked_usernames + blocked_message_signatures + blocked_words + favourite_message_signatures + friends_usernames
+
+private_datas = {
+    "prikeys" : prikeys,
+    "blocked_pubkeys" : blocked_pubkeys,
+    "blocked_usernames" : blocked_usernames,
+    "blocked_message_signatures" : blocked_message_signatures,
+    "blocked_words" : blocked_words,
+    "favourite_message_signatures" : favourite_message_signatures,
+    "friends_usernames" : friends_usernames
+}
+private_data = json.dumps(private_datas)
 # Generate a new random signing key
 #hex_key = nacl.signing.SigningKey.generate().encode(encoder=nacl.encoding.HexEncoder)
 signing_key = nacl.signing.SigningKey(hex_key, encoder=nacl.encoding.HexEncoder)
@@ -65,7 +75,6 @@ payload = {
 	"signature" : signature_hex_str
 }
 payload = json.dumps(payload).encode('utf-8')
-
 #STUDENT TO COMPLETE:
 #1. convert the payload into json representation, 
 #2. ensure the payload is in bytes, not a string

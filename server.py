@@ -159,7 +159,8 @@ def pubAuth():
 
 def authoriseUserLogin(username, password):
     print("Log on attempt from {0}:{1}".format(username, password))
-    if (username == "jyao413") and (password == "tigerj2_590856141"):
+    success = ping(username,password)
+    if (success["response"] == "ok"):
         print("Success")
         return 0
     else:
@@ -179,7 +180,6 @@ def ping(username, password):
     payload = {
         
         "username" : username,
-        "pubkey" : cherrypy.session['pubkey']
 
         
     }
@@ -198,10 +198,10 @@ def ping(username, password):
     print(JSON_object)
     if (JSON_object["response"] == "ok"):
         print("Ping success")
-        return 0
+        return JSON_object
     else:
         print ("Fail")
-        return 1
+        return JSON_object
 
 
 def get_privatedata(username, password):
