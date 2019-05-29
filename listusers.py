@@ -70,5 +70,9 @@ except urllib.error.HTTPError as error:
     exit()
 
 JSON_object = json.loads(data.decode(encoding))
+lists = JSON_object['users']
 
-print(JSON_object)
+
+for person in lists:
+    print(person['username'])
+

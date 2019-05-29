@@ -2,6 +2,7 @@ import cherrypy
 import nacl.encoding
 import nacl.signing
 import base64
+import time
 import json
 import urllib.request
 import pprint
@@ -27,14 +28,50 @@ class MainApp(object):
     # PAGES (which return HTML that can be viewed in browser)
     @cherrypy.expose
     def index(self):
-        Page = startHTML + "Welcome! This is a test website for COMPSYS302!<br/>"
+        Page = startHTML + "Welcome to Tweety!<br/>"
         
         try:
             Page += "Hello " + cherrypy.session['username'] + "!<br/>"
-            Page += "Here is some bonus text because you've logged in! <a href='/signout'>Sign out</a>"
+          #  Page += "Here is some bonus text because you've logged in! <a href='/signout'>Sign out</a><br/>"
+          #  Page += 'Public message: <input type="text" name="Broadcast Message"/><br/>'
+          #  Page += '<input type="submit" value="Submit Broadcast"/></form>'
+            Page += "click here to post a public <a href='broadcast_box'>broadcast</a>."
+            user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
+            for user in user_list:
+
+                Page += user['username'] + "</br>"
         except KeyError: #There is no username
             
             Page += "Click here to <a href='login'>login</a>."
+        return Page
+    
+    @cherrypy.expose
+    def broadcast_box(self):
+
+        try:
+            Page = startHTML + "You can broadcast a message to the cohort here<br/>"
+
+            Page += '<form action="/get_broadcast" method="post" enctype="multipart/form-data">'
+
+            Page += 'broadcast: <input type="text" name="broadcast"/><br/>'
+            Page += '<input type="submit" value="broadcast"/></form>'
+        
+
+        except KeyError:
+            Page = startHTML + "You have not logged in, please login!<br/>"
+
+        return Page
+    @cherrypy.expose
+    def get_broadcast(self, broadcast = None):
+        try:
+            Page = startHTML + "Successfully broadcast a message<br/>"
+            cherrypy.session['broadcast'] = broadcast
+            print(cherrypy.session['broadcast'])
+            send_broadcast(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['broadcast'])
+            Page += "Click here to return to the title <a href='/'>page</a>."
+
+        except KeyError:
+            Page = startHTML + "Oops something went wrong<br/>"
         return Page
         
     @cherrypy.expose
@@ -61,7 +98,7 @@ class MainApp(object):
         cherrypy.session['username'] = username
         cherrypy.session['password'] = password
         check_key(username, password)
-        error = authoriseUserLogin(username, password)
+        error = authoriseUserLogin(username, password)  
 
         if error == 0:
 
@@ -69,6 +106,7 @@ class MainApp(object):
             response = ping(username, password)
             if(response["response"] == "ok"):
                 report(username, password)
+                get_record(username,password)
             else:
                 raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
             raise cherrypy.HTTPRedirect('/')
@@ -271,6 +309,20 @@ def check_key(username, password):
     private_data_dict = json.loads(private_data['privatedata'])
     if (private_data_dict['prikeys'] == ""):
         pubAuth()
+        cherrypy.session['privatekey'] = private_data_dict['prikeys']
+        print(cherrypy.session['privatekey'])
+                #decode private signing key
+        hex_key = bytes(cherrypy.session['privatekey'] , 'utf-8')
+        hex_key_str = cherrypy.session['privatekey']
+        signing_key = nacl.signing.SigningKey(hex_key, encoder=nacl.encoding.HexEncoder)
+        verify_key = signing_key.verify_key
+        verify_key_hex = verify_key.encode(encoder=nacl.encoding.HexEncoder)
+        pubkey_hex = signing_key.verify_key.encode(encoder=nacl.encoding.HexEncoder)
+        pubkey_hex_strs = pubkey_hex.decode('utf-8')
+        cherrypy.session['pubkey'] = pubkey_hex_strs
+        cherrypy.session['signed_key'] = hex_key_str
+        cherrypy.session['signing_key'] = signing_key
+
     else:
         cherrypy.session['privatekey'] = private_data_dict['prikeys']
         print(cherrypy.session['privatekey'])
@@ -284,4 +336,100 @@ def check_key(username, password):
         pubkey_hex_strs = pubkey_hex.decode('utf-8')
         cherrypy.session['pubkey'] = pubkey_hex_strs
         cherrypy.session['signed_key'] = hex_key_str
+        cherrypy.session['signing_key'] = signing_key
             
+
+
+def send_broadcast(username,password,message):
+    url = "http://cs302.kiwi.land/api/rx_broadcast"
+    # Generate a new random signing key
+    ts = time.time()
+    get_record(username,password)
+    record = cherrypy.session['loginserver_record']
+    message_bytes = bytes(record + message + str(ts), encoding='utf-8')
+
+    signed = cherrypy.session['signing_key'].sign(message_bytes, encoder=nacl.encoding.HexEncoder)
+    signature_hex_str = signed.signature.decode('utf-8')
+
+
+
+    #create HTTP BASIC authorization header
+    credentials = ('%s:%s' % (username, password))
+    b64_credentials = base64.b64encode(credentials.encode('ascii'))
+    headers = {
+        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
+        'Content-Type' : 'application/json; charset=utf-8',
+    }
+
+    payload = {
+        "pubkey" : cherrypy.session['pubkey'],
+        "message" : message,
+        "sender_created_at" : str(ts),
+        "loginserver_record" : record,   
+        "signature" : signature_hex_str
+    }
+    payload = json.dumps(payload).encode('utf-8')
+
+    #STUDENT TO COMPLETE:
+    #1. convert the payload into json representation, 
+    #2. ensure the payload is in bytes, not a string
+
+    #3. pass the payload bytes into this function
+    try:
+        req = urllib.request.Request(url, data=payload, headers=headers)
+        response = urllib.request.urlopen(req)
+        data = response.read() # read the received bytes
+        encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
+        response.close()
+    except urllib.error.HTTPError as error:
+        print(error.read())
+        exit()
+
+    JSON_object = json.loads(data.decode(encoding))
+    print(JSON_object)    
+
+
+def get_record(username, password):
+    url = "http://cs302.kiwi.land/api/get_loginserver_record"
+ 
+    credentials = ('%s:%s' % (username, password))
+    b64_credentials = base64.b64encode(credentials.encode('ascii'))
+    headers = {
+        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
+        'Content-Type' : 'application/json; charset=utf-8',
+    }
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        response = urllib.request.urlopen(req)
+        data = response.read() # read the received bytes
+        encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
+        response.close()
+    except urllib.error.HTTPError as error:
+        print(error.read())
+        exit()
+
+    JSON_object = json.loads(data.decode(encoding))
+    cherrypy.session['loginserver_record'] = JSON_object['loginserver_record']
+    
+def list_users(username, password):
+    url = "http://cs302.kiwi.land/api/list_users"
+ 
+    credentials = ('%s:%s' % (username, password))
+    b64_credentials = base64.b64encode(credentials.encode('ascii'))
+    headers = {
+        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
+        'Content-Type' : 'application/json; charset=utf-8',
+    }
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        response = urllib.request.urlopen(req)
+        data = response.read() # read the received bytes
+        encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
+        response.close()
+    except urllib.error.HTTPError as error:
+        print(error.read())
+        exit()
+
+    JSON_object = json.loads(data.decode(encoding))
+
+    return JSON_object['users']

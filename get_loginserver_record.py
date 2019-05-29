@@ -46,9 +46,6 @@ headers = {
 }
 
 payload = {
-	"pubkey" : pubkey_hex_str,
-	"username" : username, 
-	"client_time": str(1558399771.978730)
 	
 }
 payload = json.dumps(payload).encode('utf-8')
