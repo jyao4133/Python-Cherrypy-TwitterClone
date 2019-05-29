@@ -6,6 +6,8 @@ import time
 import json
 import urllib.request
 import pprint
+import jinja2
+from jinja2 import Template
 import nacl.utils
 startHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/example.css' /></head><body>"
 
@@ -37,9 +39,48 @@ class MainApp(object):
           #  Page += '<input type="submit" value="Submit Broadcast"/></form>'
             Page += "click here to post a public <a href='broadcast_box'>broadcast</a>."
             user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
-            for user in user_list:
 
-                Page += user['username'] + "</br>"
+            Page+='''<!DOCTYPE html>
+                            <html>
+                            <head>
+                            <style>
+                                div.absolute {
+                                position: absolute;
+                                top: -75px;
+                                left: 100px
+                                }
+                            </style>
+                            </head>
+                            <body>
+                            <div class="relative">
+                            <p align="right">Online users:</p>
+                            </div>
+                            </body>
+                            </html>'''
+
+            for person in user_list:
+                Page+='''<!DOCTYPE html>
+                            <html>
+                            <head>
+                            <style>
+                                div.relative {
+                                position: relative;
+                                top: -75px;
+                                left: 100px
+                                }
+                            </style>
+                            </head>
+                            <body>
+                            <div class="relative">
+                            
+                            <p align="right"><td>%(username)s</td></p>
+                            
+                            </div>
+                            </body>
+                            </html>'''%{"username" : person['username']} 
+                
+          
+                           
         except KeyError: #There is no username
             
             Page += "Click here to <a href='login'>login</a>."
