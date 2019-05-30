@@ -37,7 +37,8 @@ class MainApp(object):
           #  Page += "Here is some bonus text because you've logged in! <a href='/signout'>Sign out</a><br/>"
           #  Page += 'Public message: <input type="text" name="Broadcast Message"/><br/>'
           #  Page += '<input type="submit" value="Submit Broadcast"/></form>'
-            Page += "click here to post a public <a href='broadcast_box'>broadcast</a>."
+            Page += "click here to post a <a href='broadcast_box'>public broadcast</a>." + "</br>"
+            Page += "click here to send a <a href='receiver_box'>private message</a>."
             user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
 
             Page+='''<!DOCTYPE html>
@@ -114,7 +115,65 @@ class MainApp(object):
         except KeyError:
             Page = startHTML + "Oops something went wrong<br/>"
         return Page
+
+    @cherrypy.expose
+    def receiver_box(self):
+        try:
+            Page = startHTML + "Enter the username of the person you want to send to. here<br/>"
+            Page += "You won't send a message unless the person is online. Check the online people on the right side!"
+            Page += '<form action="/privatemessage_box" method="post" enctype="multipart/form-data">'
+
+            Page += 'Username: <input type="text" name="Username"/><br/>'
+            Page += '<input type="submit" value="submit"/></form>'
         
+
+        except KeyError:
+            Page = startHTML + "You have not logged in, please login!<br/>"
+
+        return Page  
+
+    @cherrypy.expose
+    def privatemessage_box(self, Username = None):
+        try:
+            Page = startHTML + "Please enter the message you want to send<br/>"
+            cherrypy.session['private_username'] = Username
+            print (cherrypy.session['private_username'])
+            online_bool = False
+            poll = list_users(cherrypy.session['username'],cherrypy.session['password'])
+            for person in poll:
+                if (person['username'] == cherrypy.session['private_username']):
+                    online_bool = True
+            if (online_bool == True):
+                Page += '<form action="/send_privatemessage" method="post" enctype="multipart/form-data">'
+
+                Page += 'Message: <input type="text" name="Message"/><br/>'
+                Page += '<input type="submit" value="Ok"/></form>'
+            
+            else:
+                Page = startHTML + "The person you have entered is not online or does not exist!<br/>"
+                Page += "Click here to return to  <a href='/receiver_box'>try again</a>."
+                
+
+        except KeyError:
+            Page = startHTML + "Oops something went wrong<br/>"
+        return Page
+
+    @cherrypy.expose
+    def send_privatemessage(self, Message = None):
+        try:
+
+
+            Page = startHTML + "Successfully sent a private message<br/>"
+            cherrypy.session['message'] = Message
+            print(cherrypy.session['message'])
+            send_privatemessage(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['message'])
+            Page += "Click here to return to the title <a href='/'>page</a>."
+            
+        except KeyError:
+            Page = startHTML + "Oops something went wrong<br/>"
+        return Page
+
+
     @cherrypy.expose
     def login(self, bad_attempt = 0):
         Page = startHTML 
@@ -345,40 +404,43 @@ def report(username, password):
     return JSON_object
 
 def check_key(username, password):
+    try:
+        private_data = get_privatedata(username, password)
+        private_data_dict = json.loads(private_data['privatedata'])
 
-    private_data = get_privatedata(username, password)
-    private_data_dict = json.loads(private_data['privatedata'])
-    if (private_data_dict['prikeys'] == ""):
-        pubAuth()
-        cherrypy.session['privatekey'] = private_data_dict['prikeys']
-        print(cherrypy.session['privatekey'])
-                #decode private signing key
-        hex_key = bytes(cherrypy.session['privatekey'] , 'utf-8')
-        hex_key_str = cherrypy.session['privatekey']
-        signing_key = nacl.signing.SigningKey(hex_key, encoder=nacl.encoding.HexEncoder)
-        verify_key = signing_key.verify_key
-        verify_key_hex = verify_key.encode(encoder=nacl.encoding.HexEncoder)
-        pubkey_hex = signing_key.verify_key.encode(encoder=nacl.encoding.HexEncoder)
-        pubkey_hex_strs = pubkey_hex.decode('utf-8')
-        cherrypy.session['pubkey'] = pubkey_hex_strs
-        cherrypy.session['signed_key'] = hex_key_str
-        cherrypy.session['signing_key'] = signing_key
+        if (private_data_dict['prikeys'] == ""):
+            pubAuth()
+            cherrypy.session['privatekey'] = private_data_dict['prikeys']
+            print(cherrypy.session['privatekey'])
+                    #decode private signing key
+            hex_key = bytes(cherrypy.session['privatekey'] , 'utf-8')
+            hex_key_str = cherrypy.session['privatekey']
+            signing_key = nacl.signing.SigningKey(hex_key, encoder=nacl.encoding.HexEncoder)
+            verify_key = signing_key.verify_key
+            verify_key_hex = verify_key.encode(encoder=nacl.encoding.HexEncoder)
+            pubkey_hex = signing_key.verify_key.encode(encoder=nacl.encoding.HexEncoder)
+            pubkey_hex_strs = pubkey_hex.decode('utf-8')
+            cherrypy.session['pubkey'] = pubkey_hex_strs
+            cherrypy.session['signed_key'] = hex_key_str
+            cherrypy.session['signing_key'] = signing_key
 
-    else:
-        cherrypy.session['privatekey'] = private_data_dict['prikeys']
-        print(cherrypy.session['privatekey'])
-                #decode private signing key
-        hex_key = bytes(cherrypy.session['privatekey'] , 'utf-8')
-        hex_key_str = cherrypy.session['privatekey']
-        signing_key = nacl.signing.SigningKey(hex_key, encoder=nacl.encoding.HexEncoder)
-        verify_key = signing_key.verify_key
-        verify_key_hex = verify_key.encode(encoder=nacl.encoding.HexEncoder)
-        pubkey_hex = signing_key.verify_key.encode(encoder=nacl.encoding.HexEncoder)
-        pubkey_hex_strs = pubkey_hex.decode('utf-8')
-        cherrypy.session['pubkey'] = pubkey_hex_strs
-        cherrypy.session['signed_key'] = hex_key_str
-        cherrypy.session['signing_key'] = signing_key
-            
+        else:
+            cherrypy.session['privatekey'] = private_data_dict['prikeys']
+            print(cherrypy.session['privatekey'])
+                    #decode private signing key
+            hex_key = bytes(cherrypy.session['privatekey'] , 'utf-8')
+            hex_key_str = cherrypy.session['privatekey']
+            signing_key = nacl.signing.SigningKey(hex_key, encoder=nacl.encoding.HexEncoder)
+            verify_key = signing_key.verify_key
+            verify_key_hex = verify_key.encode(encoder=nacl.encoding.HexEncoder)
+            pubkey_hex = signing_key.verify_key.encode(encoder=nacl.encoding.HexEncoder)
+            pubkey_hex_strs = pubkey_hex.decode('utf-8')
+            cherrypy.session['pubkey'] = pubkey_hex_strs
+            cherrypy.session['signed_key'] = hex_key_str
+            cherrypy.session['signing_key'] = signing_key
+    except KeyError:
+        Page = startHTML + "Oops something went wrong<br/>"
+     
 
 
 def send_broadcast(username,password,message):
@@ -474,3 +536,60 @@ def list_users(username, password):
     JSON_object = json.loads(data.decode(encoding))
 
     return JSON_object['users']
+
+def send_privatemessage(username, password, message):
+        url = "http://cs302.kiwi.land/api/rx_privatemessage"
+
+        userlist = list_users(username, password)
+        for person in userlist:
+            print(person['username'])
+            print(cherrypy.session['private_username'])
+
+            if (person['username'] == cherrypy.session['private_username']):
+                target_pubkey = person['incoming_pubkey']
+                target_pubkey_bytes = bytes(target_pubkey, 'utf-8')
+
+
+        message = bytes(cherrypy.session['message'], 'utf-8')
+        verifykey = nacl.signing.VerifyKey(target_pubkey_bytes, encoder=nacl.encoding.HexEncoder)
+        publickey = verifykey.to_curve25519_public_key()
+        sealed_box = nacl.public.SealedBox(publickey)
+        encrypted = sealed_box.encrypt(message, encoder=nacl.encoding.HexEncoder)
+        message_en = encrypted.decode('utf-8')
+
+        ts = str(time.time())
+
+        message_bytes = bytes(cherrypy.session['loginserver_record'] + target_pubkey + cherrypy.session['private_username'] + message_en + str(ts), encoding='utf-8')
+
+        signed = cherrypy.session['signing_key'].sign(message_bytes, encoder=nacl.encoding.HexEncoder)
+        signature_hex_str = signed.signature.decode('utf-8')
+
+        credentials = ('%s:%s' % (username, password))
+        b64_credentials = base64.b64encode(credentials.encode('ascii'))
+        headers = {
+            'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
+            'Content-Type' : 'application/json; charset=utf-8',
+        }
+
+        payload = {
+            "sender_created_at" : ts,
+            "loginserver_record" : cherrypy.session['loginserver_record'],
+            "target_pubkey" : target_pubkey, 
+            "target_username" : cherrypy.session['private_username'],
+            "signature" : signature_hex_str,
+            "encrypted_message" : message_en
+
+        }
+        payload = json.dumps(payload).encode('utf-8')
+        try:
+            req = urllib.request.Request(url, data=payload, headers=headers)
+            response = urllib.request.urlopen(req)
+            data = response.read() # read the received bytes
+            encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
+            response.close()
+        except urllib.error.HTTPError as error:
+            print(error.read())
+            exit()
+
+        JSON_object = json.loads(data.decode(encoding))
+        print(JSON_object)

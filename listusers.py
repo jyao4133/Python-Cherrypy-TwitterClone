@@ -76,3 +76,4 @@ lists = JSON_object['users']
 for person in lists:
     print(person['username'])
 
+print(lists)
