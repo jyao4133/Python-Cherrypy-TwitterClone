@@ -44,6 +44,7 @@ class MainApp(object):
             Page+='''<!DOCTYPE html>
                             <html>
                             <head>
+                            <meta http-equiv="refresh" content="30"/>		             
                             <style>
                                 div.absolute {
                                 position: absolute;
@@ -63,6 +64,7 @@ class MainApp(object):
                 Page+='''<!DOCTYPE html>
                             <html>
                             <head>
+                            
                             <style>
                                 div.relative {
                                 position: relative;
@@ -593,3 +595,4 @@ def send_privatemessage(username, password, message):
 
         JSON_object = json.loads(data.decode(encoding))
         print(JSON_object)
+
