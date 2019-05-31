@@ -8,7 +8,8 @@ import urllib.request
 import pprint
 import nacl.utils
 import time
-
+import nacl.secret
+import nacl.pwhash
 
 
 
@@ -16,15 +17,15 @@ import time
 username = "jyao413"
 password = "tigerj2_590856141"
 hex_key = b'8cdc1fbb0a2ba92452211c6ffb1b481eaa41024d261d50669b6ebe204a4108f0'
-prikeys = "8cdc1fbb0a2ba92452211c6ffb1b481eaa41024d261d50669b6ebe204a4108f0"
-blocked_pubkeys = ""
-blocked_usernames = "tigerj2"
-blocked_message_signatures = ""
-blocked_words = ""
-favourite_message_signatures = ""
-friends_usernames = ""
+prikeys = ["8cdc1fbb0a2ba92452211c6ffb1b481eaa41024d261d50669b6ebe204a4108f0"]
+blocked_pubkeys = []
+blocked_usernames = []
+blocked_message_signatures = []
+blocked_words = []
+favourite_message_signatures = []
+friends_usernames = []
 ts = str(time.time())
-
+passwords = b"hello"
 
 private_datas = {
     "prikeys" : prikeys,
@@ -36,10 +37,30 @@ private_datas = {
     "friends_usernames" : friends_usernames
 }
 private_data = json.dumps(private_datas)
+
+#encrypt the data
+kdf = nacl.pwhash.argon2i.kdf # our key derivation function
+ops = nacl.pwhash.argon2i.OPSLIMIT_SENSITIVE
+mem = nacl.pwhash.argon2i.MEMLIMIT_SENSITIVE
+salt_bytes = passwords * 16 
+salt = salt_bytes[0:16]
+key = kdf(nacl.secret.SecretBox.KEY_SIZE, passwords, salt,ops,mem)
+box = nacl.secret.SecretBox(key)
+
+nonce = nacl.utils.random(nacl.secret.SecretBox.NONCE_SIZE) 
+encrypted = box.encrypt(bytes(private_data,'utf-8'),nonce)
+data = base64.b64encode(encrypted).decode("utf-8")
+
+print(encrypted)
+#decrypting
+decode_data = base64.b64decode(data)
+
+plaintext = box.decrypt(decode_data)
+print(plaintext)
+
 # Generate a new random signing key
 #hex_key = nacl.signing.SigningKey.generate().encode(encoder=nacl.encoding.HexEncoder)
 signing_key = nacl.signing.SigningKey(hex_key, encoder=nacl.encoding.HexEncoder)
-print(signing_key)
 
 
 # Sign a message with the signing key
@@ -53,8 +74,7 @@ record = "jyao413,4b5ea91f12203c5c8a140d3fac1971799daadb9b8496063ac52b278c0862a9
 
 pubkey_hex = signing_key.verify_key.encode(encoder=nacl.encoding.HexEncoder)
 pubkey_hex_str = pubkey_hex.decode('utf-8')
-print(pubkey_hex_str)
-message_bytes = bytes(private_data + record + ts, encoding='utf-8')
+message_bytes = bytes(data + record + ts, encoding='utf-8')
 
 signed = signing_key.sign(message_bytes, encoder=nacl.encoding.HexEncoder)
 signature_hex_str = signed.signature.decode('utf-8')
@@ -69,7 +89,7 @@ headers = {
 }
 
 payload = {
-    "privatedata" : private_data,
+    "privatedata" : data,
     "loginserver_record" : record,
 	"client_saved_at" : ts,
 	"signature" : signature_hex_str
@@ -92,4 +112,3 @@ except urllib.error.HTTPError as error:
 
 JSON_object = json.loads(data.decode(encoding))
 
-print(JSON_object)

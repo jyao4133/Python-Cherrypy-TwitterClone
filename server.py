@@ -9,6 +9,10 @@ import pprint
 import jinja2
 from jinja2 import Template
 import nacl.utils
+import nacl.secret
+import nacl.pwhash
+
+
 startHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/example.css' /></head><body>"
 
 class MainApp(object):
@@ -37,8 +41,8 @@ class MainApp(object):
           #  Page += "Here is some bonus text because you've logged in! <a href='/signout'>Sign out</a><br/>"
           #  Page += 'Public message: <input type="text" name="Broadcast Message"/><br/>'
           #  Page += '<input type="submit" value="Submit Broadcast"/></form>'
-            Page += "click here to post a <a href='broadcast_box'>public broadcast</a>." + "</br>"
-            Page += "click here to send a <a href='receiver_box'>private message</a>."
+            Page += "click here to post a <a href='broadcast_box'>public broadcast</a>." 
+            Page += "</br>" + "click here to send a <a href='receiver_box'>private message</a>."
             user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
 
             Page+='''<!DOCTYPE html>
@@ -184,7 +188,8 @@ class MainApp(object):
             
         Page += '<form action="/signin" method="post" enctype="multipart/form-data">'
         Page += 'Username: <input type="text" name="username"/><br/>'
-        Page += 'Password: <input type="text" name="password"/>'
+        Page += 'Password: <input type="text" name="password"/><br/>'
+        Page += 'Encryption password <input type="text" name="password2"/>'
         Page += '<input type="submit" value="Login"/></form>'
         return Page
     
@@ -195,10 +200,11 @@ class MainApp(object):
         
     # LOGGING IN AND OUT
     @cherrypy.expose
-    def signin(self, username=None, password=None):
+    def signin(self, username=None, password=None, password2 = None):
         """Check their name and password and send them either to the main page, or back to the main login screen."""
         cherrypy.session['username'] = username
         cherrypy.session['password'] = password
+        cherrypy.session['password2'] = password2
         check_key(username, password)
         error = authoriseUserLogin(username, password)  
 
@@ -372,7 +378,6 @@ def get_privatedata(username, password):
         exit()
 
     JSON_object = json.loads(data.decode(encoding))
-    print(JSON_object)
     return JSON_object
 
 def report(username, password):
@@ -408,11 +413,13 @@ def report(username, password):
 def check_key(username, password):
     try:
         private_data = get_privatedata(username, password)
-        private_data_dict = json.loads(private_data['privatedata'])
-
-        if (private_data_dict['prikeys'] == ""):
+        private_data_dict = private_data['privatedata']
+        cherrypy.session['encrypted_priv']=private_data_dict
+        private_data_dict = decrypt_privdata()
+        private_data_dict = json.loads(private_data_dict)
+        if (private_data_dict['prikeys'][0] == ""):
             pubAuth()
-            cherrypy.session['privatekey'] = private_data_dict['prikeys']
+            cherrypy.session['privatekey'] = private_data_dict['prikeys'][0]
             print(cherrypy.session['privatekey'])
                     #decode private signing key
             hex_key = bytes(cherrypy.session['privatekey'] , 'utf-8')
@@ -427,7 +434,7 @@ def check_key(username, password):
             cherrypy.session['signing_key'] = signing_key
 
         else:
-            cherrypy.session['privatekey'] = private_data_dict['prikeys']
+            cherrypy.session['privatekey'] = private_data_dict['prikeys'][0]
             print(cherrypy.session['privatekey'])
                     #decode private signing key
             hex_key = bytes(cherrypy.session['privatekey'] , 'utf-8')
@@ -596,3 +603,51 @@ def send_privatemessage(username, password, message):
         JSON_object = json.loads(data.decode(encoding))
         print(JSON_object)
 
+def add_privkey(username, password, password2):
+    
+    ts = str(time.time())
+    prikeys = ["8cdc1fbb0a2ba92452211c6ffb1b481eaa41024d261d50669b6ebe204a4108f0"]
+    blocked_pubkeys = []
+    blocked_usernames = []
+    blocked_message_signatures = []
+    blocked_words = []
+    favourite_message_signatures = []
+    friends_usernames = []    
+    
+    private_datas = {
+        "prikeys" : prikeys,
+        "blocked_pubkeys" : blocked_pubkeys,
+        "blocked_usernames" : blocked_usernames,
+        "blocked_message_signatures" : blocked_message_signatures,
+        "blocked_words" : blocked_words,
+        "favourite_message_signatures" : favourite_message_signatures,
+        "friends_usernames" : friends_usernames
+    }
+    private_data = json.dumps(private_datas)
+
+    kdf = nacl.pwhash.argon2i.kdf # our key derivation function
+    ops = nacl.pwhash.argon2i.OPSLIMIT_SENSITIVE
+    mem = nacl.pwhash.argon2i.MEMLIMIT_SENSITIVE
+    salt_bytes = password2 * 16 
+    salt = salt_bytes[0:16]
+    key = kdf(nacl.secret.SecretBox.KEY_SIZE, password2, salt,ops,mem)
+    box = nacl.secret.SecretBox(key)
+
+    nonce = nacl.utils.random(nacl.secret.SecretBox.NONCE_SIZE) 
+    encrypted = box.encrypt(bytes(private_data,'utf-8'),nonce)
+    data = base64.b64encode(encrypted).decode("utf-8")
+
+def decrypt_privdata():
+    password_bytes = bytes(cherrypy.session['password2'], 'utf-8')
+    kdf = nacl.pwhash.argon2i.kdf # our key derivation function
+    ops = nacl.pwhash.argon2i.OPSLIMIT_SENSITIVE
+    mem = nacl.pwhash.argon2i.MEMLIMIT_SENSITIVE
+    salt_bytes = password_bytes * 16 
+    salt = salt_bytes[0:16]
+    key = kdf(nacl.secret.SecretBox.KEY_SIZE, password_bytes, salt,ops,mem)
+    box = nacl.secret.SecretBox(key)
+
+    decode_data = base64.b64decode(cherrypy.session['encrypted_priv'])
+
+    plaintext = box.decrypt(decode_data)
+    return plaintext

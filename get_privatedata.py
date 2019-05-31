@@ -12,8 +12,8 @@ import nacl.utils
 
 
 #STUDENT TO UPDATE THESE...
-username = "mmir415"
-password = "mmir415_339816700"
+username = "jyao413"
+password = "tigerj2_590856141"
 hex_key = b'37704bcd1690cf848dbca707b02a2b85a918d214785cb8c4b9b1de54faa78d1b'
 
 # Generate a new random signing key
