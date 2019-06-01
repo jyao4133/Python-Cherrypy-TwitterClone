@@ -42,8 +42,9 @@ class MainApp(object):
           #  Page += "Here is some bonus text because you've logged in! <a href='/signout'>Sign out</a><br/>"
           #  Page += 'Public message: <input type="text" name="Broadcast Message"/><br/>'
           #  Page += '<input type="submit" value="Submit Broadcast"/></form>'
-            Page += "click here to post a <a href='broadcast_box'>public broadcast</a>." 
-            Page += "</br>" + "click here to send a <a href='receiver_box'>private message</a>."
+            Page += "click here to post a <a href='broadcast_box'>public broadcast</a>.<br/>" 
+            Page += "click here to send a <a href='receiver_box'>private message</a>.<br/>"
+            Page += "click here to <a href='signout'>sign out</a>.<br/>"
             user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
             test = decrypt_privdata()
             Page+='''<!DOCTYPE html>
@@ -90,10 +91,9 @@ class MainApp(object):
           
                            
         except KeyError: #There is no username
-            
             Page += "Click here to <a href='login'>login</a><br/>"
         return Page
-    
+        
     @cherrypy.expose
     def broadcast_box(self):
 
@@ -209,12 +209,11 @@ class MainApp(object):
         cherrypy.session['password'] = password
         cherrypy.session['password2'] = password2
         if (overwrite == "on"):
-            response = ping(username, password)
-            if(response["response"] == "ok"):
 
-                pubAuth()
 
-                add_privdata(username, password, password2)
+            pubAuth()
+
+            add_privdata(username, password, password2)
 
         check_key(username, password)
         error = authoriseUserLogin(username, password)  
@@ -225,7 +224,9 @@ class MainApp(object):
 
             response = ping(username, password)
             if(response["response"] == "ok" and cherrypy.session['failflag'] == "pass"):
+                cherrypy.session['status'] = "online"
                 report(username, password)
+                
                 get_record(username,password)
             else:
                 raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
@@ -236,6 +237,8 @@ class MainApp(object):
     @cherrypy.expose
     def signout(self):
         """Logs the current user out, expires their session"""
+        cherrypy.session['status'] = "offline"
+        report(cherrypy.session['username'],cherrypy.session['password'])
         username = cherrypy.session.get('username')
         if username is None:
             pass
@@ -409,7 +412,8 @@ def report(username, password):
     payload = {
         "incoming_pubkey" : cherrypy.session['pubkey'],
         "connection_address" : "127.0.0.1:8000",
-        "connection_location" : "2"
+        "connection_location" : "2",
+        "status" : cherrypy.session['status']
         
     }
     payload = json.dumps(payload).encode('utf-8')
