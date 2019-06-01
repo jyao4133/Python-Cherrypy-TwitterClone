@@ -13,6 +13,7 @@ import nacl.secret
 import nacl.pwhash
 
 
+
 startHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/example.css' /></head><body>"
 
 class MainApp(object):
@@ -44,7 +45,7 @@ class MainApp(object):
             Page += "click here to post a <a href='broadcast_box'>public broadcast</a>." 
             Page += "</br>" + "click here to send a <a href='receiver_box'>private message</a>."
             user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
-
+            test = decrypt_privdata()
             Page+='''<!DOCTYPE html>
                             <html>
                             <head>
@@ -90,7 +91,7 @@ class MainApp(object):
                            
         except KeyError: #There is no username
             
-            Page += "Click here to <a href='login'>login</a>."
+            Page += "Click here to <a href='login'>login</a><br/>"
         return Page
     
     @cherrypy.expose
@@ -185,11 +186,13 @@ class MainApp(object):
         Page = startHTML 
         if bad_attempt != 0:
             Page += "<font color='red'>Invalid username/password!</font>"
-            
+
         Page += '<form action="/signin" method="post" enctype="multipart/form-data">'
         Page += 'Username: <input type="text" name="username"/><br/>'
         Page += 'Password: <input type="text" name="password"/><br/>'
-        Page += 'Encryption password <input type="text" name="password2"/>'
+
+        Page += 'Encryption password <input type="text" name="password2"/><br/>'
+        Page += 'New private data(This will overwrite your previous data): <input type="checkbox" name="overwrite"/><br/>'
         Page += '<input type="submit" value="Login"/></form>'
         return Page
     
@@ -200,19 +203,28 @@ class MainApp(object):
         
     # LOGGING IN AND OUT
     @cherrypy.expose
-    def signin(self, username=None, password=None, password2 = None):
+    def signin(self, username=None, password=None, password2 = None, overwrite = None):
         """Check their name and password and send them either to the main page, or back to the main login screen."""
         cherrypy.session['username'] = username
         cherrypy.session['password'] = password
         cherrypy.session['password2'] = password2
+        if (overwrite == "on"):
+            response = ping(username, password)
+            if(response["response"] == "ok"):
+
+                pubAuth()
+
+                add_privdata(username, password, password2)
+
         check_key(username, password)
         error = authoriseUserLogin(username, password)  
+
 
         if error == 0:
 
 
             response = ping(username, password)
-            if(response["response"] == "ok"):
+            if(response["response"] == "ok" and cherrypy.session['failflag'] == "pass"):
                 report(username, password)
                 get_record(username,password)
             else:
@@ -236,8 +248,8 @@ class MainApp(object):
 ### Functions only after here
 ###
 def pubAuth():
-    username = cherrypy.session['username'] #"jyao413"   
-    password = cherrypy.session['password']#"tigerj2_590856141" #
+    username = "jyao413"   
+    password = "tigerj2_590856141" #
     url = "http://cs302.kiwi.land/api/add_pubkey"
 
 
@@ -245,12 +257,16 @@ def pubAuth():
 # Generate a new random signing key
     hex_key = nacl.signing.SigningKey.generate().encode(encoder=nacl.encoding.HexEncoder)
     signing_key = nacl.signing.SigningKey(hex_key, encoder=nacl.encoding.HexEncoder)
-    print(hex_key)
+    cherrypy.session['temp_key'] = signing_key
+    hex_key_str = hex_key.decode("utf-8")
+    cherrypy.session['new_privkey'] = hex_key_str
+    
+    print(hex_key_str)
 
 
 # Sign a message with the signing key
 
-# Obtain the verify key for a given signing key
+# Obtain the verify key for a given signing key                  
     verify_key = signing_key.verify_key
 
 # Serialize the verify key to send it to a third party
@@ -258,12 +274,12 @@ def pubAuth():
 
     pubkey_hex = signing_key.verify_key.encode(encoder=nacl.encoding.HexEncoder)
     pubkey_hex_str = pubkey_hex.decode('utf-8')
-
+    cherrypy.session['signed_key'] = pubkey_hex_str
     message_bytes = bytes(pubkey_hex_str + username, encoding='utf-8')
 
     signed = signing_key.sign(message_bytes, encoder=nacl.encoding.HexEncoder)
     signature_hex_str = signed.signature.decode('utf-8')
-
+    cherrypy.session['signature_hex_str'] = signature_hex_str
 #create HTTP BASIC authorization header
     credentials = ('%s:%s' % (username, password))
     b64_credentials = base64.b64encode(credentials.encode('ascii'))
@@ -296,6 +312,7 @@ def pubAuth():
 
     JSON_object = json.loads(data.decode(encoding))
     print(JSON_object)
+    cherrypy.session['loginserver_record'] = JSON_object['loginserver_record']
     if (JSON_object["response"] == "ok"):
         print("Successfully added a pubkey for user")
         cherrypy.session['signing_key'] = signing_key
@@ -603,10 +620,10 @@ def send_privatemessage(username, password, message):
         JSON_object = json.loads(data.decode(encoding))
         print(JSON_object)
 
-def add_privkey(username, password, password2):
+def add_privdata(username, password, password2):
     
     ts = str(time.time())
-    prikeys = ["8cdc1fbb0a2ba92452211c6ffb1b481eaa41024d261d50669b6ebe204a4108f0"]
+    prikeys = [cherrypy.session['new_privkey']]
     blocked_pubkeys = []
     blocked_usernames = []
     blocked_message_signatures = []
@@ -623,8 +640,10 @@ def add_privkey(username, password, password2):
         "favourite_message_signatures" : favourite_message_signatures,
         "friends_usernames" : friends_usernames
     }
+    
     private_data = json.dumps(private_datas)
-
+    password2 = bytes(password2, 'utf-8')
+    #create a secret box 
     kdf = nacl.pwhash.argon2i.kdf # our key derivation function
     ops = nacl.pwhash.argon2i.OPSLIMIT_SENSITIVE
     mem = nacl.pwhash.argon2i.MEMLIMIT_SENSITIVE
@@ -632,22 +651,65 @@ def add_privkey(username, password, password2):
     salt = salt_bytes[0:16]
     key = kdf(nacl.secret.SecretBox.KEY_SIZE, password2, salt,ops,mem)
     box = nacl.secret.SecretBox(key)
+    #create a unique nonce and encrypt our private data
 
     nonce = nacl.utils.random(nacl.secret.SecretBox.NONCE_SIZE) 
     encrypted = box.encrypt(bytes(private_data,'utf-8'),nonce)
     data = base64.b64encode(encrypted).decode("utf-8")
 
+    url = "http://cs302.kiwi.land/api/add_privatedata"
+    message_bytes = bytes(data + cherrypy.session['loginserver_record'] + ts, encoding='utf-8')
+
+    signed = cherrypy.session['temp_key'].sign(message_bytes, encoder=nacl.encoding.HexEncoder)
+    signature_hex_str = signed.signature.decode('utf-8')
+
+    credentials = ('%s:%s' % (username, password))
+    b64_credentials = base64.b64encode(credentials.encode('ascii'))
+    headers = {
+        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
+        'Content-Type' : 'application/json; charset=utf-8',
+    }
+    print(cherrypy.session['loginserver_record'])
+
+    payload = {
+        "privatedata" : data,
+        "client_saved_at" : ts,
+        "loginserver_record" : cherrypy.session['loginserver_record'],
+        "signature" : signature_hex_str
+    }
+    payload = json.dumps(payload).encode('utf-8')
+    try:
+        req = urllib.request.Request(url, data=payload, headers=headers)
+        response = urllib.request.urlopen(req)
+        data = response.read() # read the received bytes
+        encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
+        response.close()
+    except urllib.error.HTTPError as error:
+        print(error.read())
+        exit()
+
+    JSON_object = json.loads(data.decode(encoding))
+    print(JSON_object)
+
+
 def decrypt_privdata():
-    password_bytes = bytes(cherrypy.session['password2'], 'utf-8')
-    kdf = nacl.pwhash.argon2i.kdf # our key derivation function
-    ops = nacl.pwhash.argon2i.OPSLIMIT_SENSITIVE
-    mem = nacl.pwhash.argon2i.MEMLIMIT_SENSITIVE
-    salt_bytes = password_bytes * 16 
-    salt = salt_bytes[0:16]
-    key = kdf(nacl.secret.SecretBox.KEY_SIZE, password_bytes, salt,ops,mem)
-    box = nacl.secret.SecretBox(key)
+    try:
+        password_bytes = bytes(cherrypy.session['password2'], 'utf-8')
+        kdf = nacl.pwhash.argon2i.kdf # our key derivation function
+        ops = nacl.pwhash.argon2i.OPSLIMIT_SENSITIVE
+        mem = nacl.pwhash.argon2i.MEMLIMIT_SENSITIVE
+        salt_bytes = password_bytes * 16 
+        salt = salt_bytes[0:16]
+        key = kdf(nacl.secret.SecretBox.KEY_SIZE, password_bytes, salt,ops,mem)
+        box = nacl.secret.SecretBox(key)
 
-    decode_data = base64.b64decode(cherrypy.session['encrypted_priv'])
+        decode_data = base64.b64decode(cherrypy.session['encrypted_priv'])
 
-    plaintext = box.decrypt(decode_data)
-    return plaintext
+        plaintext = box.decrypt(decode_data)
+        cherrypy.session['failflag'] = "pass"
+        return plaintext
+    except nacl.exceptions.CryptoError:
+        print("ASGIOASNGOISAGNIOASGNIOSANGOIASGNOI")
+        raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
+        cherrypy.session['failflag'] = "fail"
+        cherrypy.lib.sessions.expire()
