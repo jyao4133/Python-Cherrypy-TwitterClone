@@ -116,7 +116,13 @@ class MainApp(object):
             Page = startHTML + "Successfully broadcast a message<br/>"
             cherrypy.session['broadcast'] = broadcast
             print(cherrypy.session['broadcast'])
-            send_broadcast(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['broadcast'])
+            poll = list_users(cherrypy.session['username'],cherrypy.session['password'])
+            for user in poll:
+                ip = user['connection_address'] 
+                if (ip == "http://172.23.54.164:8000"):
+                    print ("don't send to yourself")
+                else:    
+                    send_broadcast(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['broadcast'], ip)
             Page += "Click here to return to the title <a href='/'>page</a>."
 
         except KeyError:
@@ -411,7 +417,7 @@ def report(username, password):
 
     payload = {
         "incoming_pubkey" : cherrypy.session['pubkey'],
-        "connection_address" : "127.0.0.1:8000",
+        "connection_address" : "172.23.54.164:8000",
         "connection_location" : "2",
         "status" : cherrypy.session['status']
         
@@ -473,8 +479,8 @@ def check_key(username, password):
      
 
 
-def send_broadcast(username,password,message):
-    url = "http://cs302.kiwi.land/api/rx_broadcast"
+def send_broadcast(username,password,message,ip):
+    url = "http://" + ip + "/api/rx_broadcast"
     # Generate a new random signing key
     ts = time.time()
     get_record(username,password)
@@ -513,13 +519,13 @@ def send_broadcast(username,password,message):
         response = urllib.request.urlopen(req)
         data = response.read() # read the received bytes
         encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
+        
+        JSON_object = json.loads(data.decode(encoding))
+        print(JSON_object)
         response.close()
-    except urllib.error.HTTPError as error:
-        print(error.read())
-        exit()
-
-    JSON_object = json.loads(data.decode(encoding))
-    print(JSON_object)    
+    except (urllib.error.HTTPError,urllib.error.URLError,json.decoder.JSONDecodeError) as error:
+        return
+    
 
 
 def get_record(username, password):

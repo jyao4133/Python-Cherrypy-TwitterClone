@@ -18,7 +18,7 @@ import server
 
 import api.api
 # The address we listen for connections on
-LISTEN_IP = "127.0.0.1"
+LISTEN_IP = "172.23.54.164"
 LISTEN_PORT = 8000
 
 def runMainApp():

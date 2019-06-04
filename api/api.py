@@ -21,7 +21,12 @@ class Api(object):
         return {'response' : "ok"}
     
     @cherrypy.expose
+    @cherrypy.tools.json_in()
     def rx_broadcast(self):
         #request = cherrypy.request[]
-        return {'response' : "ok"}
+        payload = {'response' : "ok"}
+        payload = json.dumps(payload).encode('utf-8')
+        data = cherrypy.request.json
+        print(data)
+        return payload
         
