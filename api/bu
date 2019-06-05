@@ -1,0 +1,44 @@
+            Page+= '''<!DOCTYPE html>
+                            <html lang="en">
+                            <head>
+                            <title>Bootstrap Example</title>
+                            <meta charset="utf-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1">
+                            <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
+                            <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+                            <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js"></script>
+                            </head>
+                            <body>
+
+                            <div class="container">
+                            <h2>Basic List Group</h2>
+                            <ul class="list-group">
+                            <script>
+                                var JSDict = JSON.parse(user_list_dump);
+                                var i;
+                                for (x in JSDict) {
+                                    <li class="list-group-item">JSDict[x]<td></td></li>
+                                }
+                            </script>
+                                
+                            </ul>
+                            </div>
+                            </body>
+                            </html>'''
+                
+                
+
+
+
+
+
+
+
+                    <ul>
+                        {% for user in user_list %}
+                            {# if user['username'] != username #}
+                            <li> {{user['username']}}</li>
+                            {# endif #}
+                        {% endof%}
+                    </ul>
+                            </html>'''

@@ -15,7 +15,7 @@ import nacl.pwhash
 
 
 startHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/example.css' /></head><body>"
-
+pageHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/flex.css' /></head><body>"
 class MainApp(object):
 
     #CherryPy Configuration
@@ -28,71 +28,68 @@ class MainApp(object):
     @cherrypy.expose
     def default(self, *args, **kwargs):
         """The default page, given when we don't recognise where the request is for."""
-        Page = startHTML + "I don't know where you're trying to go, so have a 404 Error."
+        Page = startHTML + '''<!DOCTYPE html>
+                            <html>
+                            <head>
+                            <link rel='stylesheet' href='/static/example.css' />
+                            </head>
+                            <body>
+                            <header>
+                            <div class="header-block">
+                            <div id="demoFont">Twitmore</div>
+                            </div>
+                            </header>
+                            </body>
+                            </html>'''
         cherrypy.response.status = 404
         return Page
 
     # PAGES (which return HTML that can be viewed in browser)
     @cherrypy.expose
-    def index(self):
-        Page = startHTML + "Welcome to Tweety!<br/>"
-        
+    def index(self):    
+        Page = startHTML
         try:
-            Page += "Hello " + cherrypy.session['username'] + "!<br/>"
+            
+            
+            
+          #  Page += "Hello " + cherrypy.session['username'] + "!<br/>"
           #  Page += "Here is some bonus text because you've logged in! <a href='/signout'>Sign out</a><br/>"
           #  Page += 'Public message: <input type="text" name="Broadcast Message"/><br/>'
           #  Page += '<input type="submit" value="Submit Broadcast"/></form>'
-            Page += "click here to post a <a href='broadcast_box'>public broadcast</a>.<br/>" 
-            Page += "click here to send a <a href='receiver_box'>private message</a>.<br/>"
-            Page += "click here to <a href='signout'>sign out</a>.<br/>"
+          #  Page += "click here to post a <a href='broadcast_box'>public broadcast</a>.<br/>" 
+          #  Page += "click here to send a <a href='receiver_box'>private message</a>.<br/>"
+           # Page += "click here to <a href='signout'>sign out</a>.<br/>"
             user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
+            report(cherrypy.session['username'],cherrypy.session['password'])
             test = decrypt_privdata()
-            Page+='''<!DOCTYPE html>
-                            <html>
-                            <head>
-                            <meta http-equiv="refresh" content="30"/>		             
-                            <style>
-                                div.absolute {
-                                position: absolute;
-                                top: -75px;
-                                left: 100px
-                                }
-                            </style>
-                            </head>
-                            <body>
-                            <div class="relative">
-                            <p align="right">Online users:</p>
-                            </div>
-                            </body>
-                            </html>'''
-
+            send_dict = json.dumps(user_list)
+            print(user_list)
+            Page = pageHTML
+            Page += '''<body><header><h1><ul class="my-list-style">
+                        <li class="my-list-style"><a href='/'>Home</a></li>
+                        <li class="my-list-style"><a href='broadcast_box'>public broadcast</a></li>
+                        <li class="my-list-style"><a href='receiver_box'>private message</a></li>
+                        <li class="my-list-style"><a href='create_group'>group message</a></li>
+                        </ul></header></body><h1>'''
+            Page+="<h2>Online Users</h2>"
             for person in user_list:
-                Page+='''<!DOCTYPE html>
-                            <html>
-                            <head>
-                            
-                            <style>
-                                div.relative {
-                                position: relative;
-                                top: -75px;
-                                left: 100px
-                                }
-                            </style>
-                            </head>
-                            <body>
-                            <div class="relative">
-                            
-                            <p align="right"><td>%(username)s</td></p>
-                            
-                            </div>
-                            </body>
+                Page+= '''<!DOCTYPE html>
+                            <ul class="list-group">
+                            <li class="list-group-item"><td>%(username)s</td></li>
+                            </ul>
                             </html>'''%{"username" : person['username']} 
-                
-          
+
+            return Page
                            
         except KeyError: #There is no username
-            Page += "Click here to <a href='login'>login</a><br/>"
-        return Page
+            Page +='''<div class="login-page">
+                    <div class="form">
+                        <button onclick="window.location.href = '/login';">login</button>
+                        </form>
+                        </div>
+                    </div>'''
+
+            return Page
         
     @cherrypy.expose
     def broadcast_box(self):
@@ -188,18 +185,24 @@ class MainApp(object):
 
 
     @cherrypy.expose
-    def login(self, bad_attempt = 0):
+    def login(self, bad_attempt = 0, *vars, **kwargs):
         Page = startHTML 
         if bad_attempt != 0:
             Page += "<font color='red'>Invalid username/password!</font>"
 
-        Page += '<form action="/signin" method="post" enctype="multipart/form-data">'
-        Page += 'Username: <input type="text" name="username"/><br/>'
-        Page += 'Password: <input type="text" name="password"/><br/>'
 
-        Page += 'Encryption password <input type="text" name="password2"/><br/>'
-        Page += 'New private data(This will overwrite your previous data): <input type="checkbox" name="overwrite"/><br/>'
-        Page += '<input type="submit" value="Login"/></form>'
+
+        Page += '''<div class="login-page">
+                    <div class="form">
+                        '<form action="/signin" method="post" enctype="multipart/form-data">'
+                        <input type="text" name="username" placeholder="username"/>
+                        <input type="text" name="password" placeholder="password"/>
+                        <input type="text" name="password2" placeholder="password2"/>
+                        <button>login</button>
+                        'New private data(This will overwrite your previous data): <input type="checkbox" name="overwrite"/><br/>'
+                    </div>
+                    </div>'''
+        
         return Page
     
     @cherrypy.expose    
@@ -211,23 +214,21 @@ class MainApp(object):
     @cherrypy.expose
     def signin(self, username=None, password=None, password2 = None, overwrite = None):
         """Check their name and password and send them either to the main page, or back to the main login screen."""
+        print(overwrite)
+
         cherrypy.session['username'] = username
         cherrypy.session['password'] = password
         cherrypy.session['password2'] = password2
         if (overwrite == "on"):
-
-
             pubAuth()
-
             add_privdata(username, password, password2)
-
         check_key(username, password)
+
         error = authoriseUserLogin(username, password)  
-
-
         if error == 0:
+            
 
-
+            check_key(username, password)
             response = ping(username, password)
             if(response["response"] == "ok" and cherrypy.session['failflag'] == "pass"):
                 cherrypy.session['status'] = "online"
@@ -238,7 +239,7 @@ class MainApp(object):
                 raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
             raise cherrypy.HTTPRedirect('/')
         else:
-            raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
+            raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
 
     @cherrypy.expose
     def signout(self):
@@ -335,12 +336,15 @@ def pubAuth():
 
 def authoriseUserLogin(username, password):
     print("Log on attempt from {0}:{1}".format(username, password))
-    success = ping(username,password)
-    if (success["response"] == "ok"):
-        print("Success")
-        return 0
-    else:
-        print("Failure")
+    try:
+        success = ping(username,password)
+        if (success["response"] == "ok"):
+            print("Success")
+            return 0
+        else:
+            print("Failure")
+            return 1
+    except KeyError:
         return 1
 
 
@@ -399,12 +403,13 @@ def get_privatedata(username, password):
         data = response.read() # read the received bytes
         encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
         response.close()
+            
+        JSON_object = json.loads(data.decode(encoding))
+        return JSON_object
     except urllib.error.HTTPError as error:
-        print(error.read())
-        exit()
+        raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
 
-    JSON_object = json.loads(data.decode(encoding))
-    return JSON_object
+
 
 def report(username, password):
     url = "http://cs302.kiwi.land/api/report"
@@ -475,7 +480,7 @@ def check_key(username, password):
             cherrypy.session['signed_key'] = hex_key_str
             cherrypy.session['signing_key'] = signing_key
     except KeyError:
-        Page = startHTML + "Oops something went wrong<br/>"
+        raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
      
 
 

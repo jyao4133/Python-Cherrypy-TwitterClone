@@ -16,9 +16,10 @@ import cherrypy
 
 import server
 
+
 import api.api
-# The address we listen for connections on
-LISTEN_IP = "172.23.54.164"
+# The address we listen for connections onw
+LISTEN_IP = "192.168.1.64"
 LISTEN_PORT = 8000
 
 def runMainApp():
