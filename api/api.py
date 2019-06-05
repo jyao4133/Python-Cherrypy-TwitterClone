@@ -12,7 +12,7 @@ import nacl.utils
 import nacl.secret
 import nacl.pwhash
 
-
+import database
 
 
 class Api(object):
@@ -27,6 +27,7 @@ class Api(object):
         payload = {'response' : "ok"}
         payload = json.dumps(payload).encode('utf-8')
         data = cherrypy.request.json
+        database.addtoDB_broadcast(data)
         print(data)
         return payload
         

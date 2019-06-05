@@ -1,19 +1,9 @@
-<!DOCTYPE html>
 
-<html>
-<head>
-<link rel='stylesheet' href='example.css' type='text/css' />
+<link rel="stylesheet" type="text/css" href="flex.css">
 
-<div class="login-page">
-                    <div class="form">
-                        '<form action="/signin" method="post" enctype="multipart/form-data">'
-                        <input type="text" name="username" placeholder="username"/>
-                        <input type="text" name="password" placeholder="password"/>
-                        <input type="text" name="password2" placeholder="password2"/>
-                        <button>login</button>
-                        'New private data(This will overwrite your previous data): <input type="checkbox" name="overwrite"/><br/>'
-                    </div>
-                    
-</div>
-</head
-<body>
+<h2>Online Users</h2>
+<ul class="list-group">
+    {% for user in user_list %}
+        <li class="list-group-item"> {{user['username']}}</li>
+    {% endfor %}
+</ul>

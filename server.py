@@ -8,14 +8,17 @@ import urllib.request
 import pprint
 import jinja2
 from jinja2 import Template
+from jinja2 import Environment
+from jinja2 import FileSystemLoader
 import nacl.utils
 import nacl.secret
 import nacl.pwhash
 
-
-
+import database
+env = Environment(loader=FileSystemLoader('static'), autoescape=True)
 startHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/example.css' /></head><body>"
 pageHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/flex.css' /></head><body>"
+timelineHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/timeline.css' /></head><body>"
 class MainApp(object):
 
     #CherryPy Configuration
@@ -58,12 +61,14 @@ class MainApp(object):
           #  Page += '<input type="submit" value="Submit Broadcast"/></form>'
           #  Page += "click here to post a <a href='broadcast_box'>public broadcast</a>.<br/>" 
           #  Page += "click here to send a <a href='receiver_box'>private message</a>.<br/>"
-           # Page += "click here to <a href='signout'>sign out</a>.<br/>"
+          #  Page += "click here to <a href='signout'>sign out</a>.<br/>"
             user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
             report(cherrypy.session['username'],cherrypy.session['password'])
             test = decrypt_privdata()
             send_dict = json.dumps(user_list)
             print(user_list)
+            template = env.get_template('login.html')
+            htmldict = render_template(template, user_list)
             Page = pageHTML
             Page += '''<body><header><h1><ul class="my-list-style">
                         <li class="my-list-style"><a href='/'>Home</a></li>
@@ -71,16 +76,23 @@ class MainApp(object):
                         <li class="my-list-style"><a href='receiver_box'>private message</a></li>
                         <li class="my-list-style"><a href='create_group'>group message</a></li>
                         </ul></header></body><h1>'''
-            Page+="<h2>Online Users</h2>"
-            for person in user_list:
-                Page+= '''<!DOCTYPE html>
-                            <ul class="list-group">
-                            <li class="list-group-item"><td>%(username)s</td></li>
-                            </ul>
-                            </html>'''%{"username" : person['username']} 
+                        
+            Page += htmldict
+            broadcasts = database.get_broadcast_messages()
 
+            for broadcast in broadcasts:
+                Page+= timelineHTML+ '''<!DOCTYPE html>
+                                <ul class="broadcast">
+                               <li class="broadcast-style"><td>%(message)s</td></h4>
+                                <p>List Group Item Text</p></li>
+                                </ul>
+                            </html>'''%{"message" : broadcast['message']} 
+                
             return Page
-                           
+                         
+
+
+
         except KeyError: #There is no username
             Page +='''<div class="login-page">
                     <div class="form">
@@ -728,3 +740,7 @@ def decrypt_privdata():
         raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
         cherrypy.session['failflag'] = "fail"
         cherrypy.lib.sessions.expire()
+
+
+def render_template(template, list_user):
+    return template.render(user_list=list_user)

@@ -42,3 +42,50 @@
                         {% endof%}
                     </ul>
                             </html>'''
+
+
+
+
+
+
+
+
+
+
+
+                            LARGE BACKUP
+
+
+
+
+
+
+
+
+
+            Page = pageHTML
+            Page += '''<body><header><h1><ul class="my-list-style">
+                        <li class="my-list-style"><a href='/'>Home</a></li>
+                        <li class="my-list-style"><a href='broadcast_box'>public broadcast</a></li>
+                        <li class="my-list-style"><a href='receiver_box'>private message</a></li>
+                        <li class="my-list-style"><a href='create_group'>group message</a></li>
+                        </ul></header></body><h1>'''
+            Page+="<h2>Online Users</h2>"
+            for person in user_list:
+                Page+= '''<!DOCTYPE html>
+                            <ul class="list-group">
+                            <li class="list-group-item"><td>%(username)s</td></li>
+                            </ul>
+                            </html>'''%{"username" : person['username']} 
+            broadcasts = database.get_broadcast_messages()
+
+            for broadcast in broadcasts:
+                Page+= timelineHTML+ '''<!DOCTYPE html>
+                                <ul class="broadcast">
+                               <li class="broadcast-style"><td>%(message)s</td></h4>
+                                <p>List Group Item Text</p></li>
+                                </ul>
+                            </html>'''%{"message" : broadcast['message']} 
+                
+            return Page
+                         
