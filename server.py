@@ -258,8 +258,8 @@ class MainApp(object):
 ### Functions only after here
 ###
 def pubAuth():
-    username = "jyao413"   
-    password = "tigerj2_590856141" #
+    username = cherrypy.session['username']   
+    password = cherrypy.session['password'] #
     url = "http://cs302.kiwi.land/api/add_pubkey"
 
 
