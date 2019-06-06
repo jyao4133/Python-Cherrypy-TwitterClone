@@ -43,6 +43,7 @@ def runMainApp():
             'tools.staticdir.on': True,
             'tools.staticdir.dir': 'static',
         },
+
         
         #once a favicon is set up, the following code could be used to select it for cherrypy
         #'/favicon.ico': {
@@ -80,6 +81,6 @@ def runMainApp():
     # And stop doing anything else. Let the web server take over.
     cherrypy.engine.block()
  
-#Run the function to start everything
+#Run the function to start everything.
 if __name__ == '__main__':
     runMainApp()

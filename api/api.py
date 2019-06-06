@@ -30,4 +30,16 @@ class Api(object):
         database.addtoDB_broadcast(data)
         print(data)
         return payload
+
+    @cherrypy.expose
+    @cherrypy.tools.json_in()
+    def rx_privatemessage(self):
+        payload = {'response' : "ok"}
+        payload = json.dumps(payload).encode('utf-8')
+        data = cherrypy.request.json
+
+        print(data)
+        return payload
+
+
         

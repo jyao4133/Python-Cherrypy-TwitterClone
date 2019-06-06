@@ -1,9 +1,31 @@
 
-<link rel="stylesheet" type="text/css" href="flex.css">
-
+<link rel="stylesheet" type="text/css" href="static/flex.css">
+<body><header><h1><ul class="my-list-style">
+                        <li class="my-list-style"><a href='/'>Home</a></li>
+                        <li class="my-list-style"><a href='broadcast_box'>public broadcast</a></li>
+                        <li class="my-list-style"><a href='receiver_box'>private message</a></li>
+                        <li class="my-list-style"><a href='create_group'>group message</a></li>
+                        </ul></header></body><h1>
 <h2>Online Users</h2>
+<div id="users">
 <ul class="list-group">
     {% for user in user_list %}
         <li class="list-group-item"> {{user['username']}}</li>
     {% endfor %}
 </ul>
+</div>
+<div id="demo">
+
+<ul class="broadcast-style">
+    <h3>Broadcasts</h3>
+
+    {% for broadcast in message_list%}
+        <li class="broadcast-style">{{broadcast['message']}}
+        <p>{{broadcast['loginserver_record']}} Sent at:{{broadcast['sender_created_at']}}</p></li>
+    {% endfor %}
+</ul>
+
+</div>
+
+<script src="/static/index.js">
+</script>

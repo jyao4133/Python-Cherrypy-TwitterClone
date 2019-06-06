@@ -4,7 +4,7 @@
 }
 
 ul.list-group{
-    display:flex;
+    display:inline-flex;
     flex-direction: column;
     max-width: 100px;
     
@@ -35,10 +35,15 @@ h1{
 h2{
   margin: 100 1 1 0; 
 }
+
+h3 {
+
+}
 header {
     background: #415e9b;
-    height:85px;
-    position: fixed;
+    height:0px;
+    top: 0;
+    position: absolute;
     padding: 0;
     margin:0;
 }
@@ -66,15 +71,30 @@ li a:hover {
     background-color: #111;
   }
 
-ul.broadcast {
-    display:flex;
-    margin: -1 1 1 500;
-    flex-direction: row;
-    
+ul.broadcast-style {
+    display:inline-flex;
+    flex-direction: column;
+    max-width: 50%;
+    list-style-type: none;    
+    margin-left: 300px;
+    margin-top: 0px;
 }
 li.broadcast-style {
   border:1px solid black;
   margin:0.3em;
   padding:0.3em;
 
+}
+
+#demo {
+  display:inline-flex;
+
+  margin-left: 0px;
+  margin-top: -200px;
+}
+
+#users {
+  display:inline-flex;
+
+  margin-left: 0px;
 }

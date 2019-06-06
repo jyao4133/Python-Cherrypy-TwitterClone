@@ -1,0 +1,7 @@
+<ul class="broadcast-style">
+    <h3>Broadcasts</h3>
+    {% for broadcast in message_list%}
+        <li class="broadcast-style">{{broadcast['message']}}
+        <p>{{broadcast['loginserver_record']}} Sent at:{{broadcast['sender_created_at']}}</p></li>
+    {% endfor %}
+</ul>

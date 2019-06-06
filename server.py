@@ -46,6 +46,32 @@ class MainApp(object):
                             </html>'''
         cherrypy.response.status = 404
         return Page
+    
+    @cherrypy.tools.json_out()
+    @cherrypy.expose
+    def showmessages(self):
+            user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
+            report(cherrypy.session['username'],cherrypy.session['password'])
+            test = decrypt_privdata()
+            send_dict = json.dumps(user_list)
+            print(user_list)
+            broadcasts = database.get_broadcast_messages()
+            template = env.get_template('broadcastmessage.html')
+            htmldict = render_template(template, user_list, broadcasts)
+            dict_html = {"data" : htmldict}
+            dict_dump = json.dumps(dict_html)
+            print(htmldict)
+            return dict_dump
+
+    @cherrypy.tools.json_out()
+    @cherrypy.expose
+    def showusers(self):
+        user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
+        template = env.get_template('userlist.html')
+        htmldict = render_template_user(template, user_list)
+        dict_html = {"data" : htmldict}
+        dict_dump = json.dumps(dict_html)
+        return dict_dump
 
     # PAGES (which return HTML that can be viewed in browser)
     @cherrypy.expose
@@ -67,27 +93,14 @@ class MainApp(object):
             test = decrypt_privdata()
             send_dict = json.dumps(user_list)
             print(user_list)
+            broadcasts = database.get_broadcast_messages()
             template = env.get_template('login.html')
-            htmldict = render_template(template, user_list)
+            htmldict = render_template(template, user_list, broadcasts)
             Page = pageHTML
-            Page += '''<body><header><h1><ul class="my-list-style">
-                        <li class="my-list-style"><a href='/'>Home</a></li>
-                        <li class="my-list-style"><a href='broadcast_box'>public broadcast</a></li>
-                        <li class="my-list-style"><a href='receiver_box'>private message</a></li>
-                        <li class="my-list-style"><a href='create_group'>group message</a></li>
-                        </ul></header></body><h1>'''
+
                         
             Page += htmldict
-            broadcasts = database.get_broadcast_messages()
 
-            for broadcast in broadcasts:
-                Page+= timelineHTML+ '''<!DOCTYPE html>
-                                <ul class="broadcast">
-                               <li class="broadcast-style"><td>%(message)s</td></h4>
-                                <p>List Group Item Text</p></li>
-                                </ul>
-                            </html>'''%{"message" : broadcast['message']} 
-                
             return Page
                          
 
@@ -128,7 +141,7 @@ class MainApp(object):
             poll = list_users(cherrypy.session['username'],cherrypy.session['password'])
             for user in poll:
                 ip = user['connection_address'] 
-                if (ip == "http://172.23.54.164:8000"):
+                if (ip == "http://192.168.1.64:8000"):
                     print ("don't send to yourself")
                 else:    
                     send_broadcast(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['broadcast'], ip)
@@ -736,11 +749,15 @@ def decrypt_privdata():
         cherrypy.session['failflag'] = "pass"
         return plaintext
     except nacl.exceptions.CryptoError:
-        print("ASGIOASNGOISAGNIOASGNIOSANGOIASGNOI")
         raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
         cherrypy.session['failflag'] = "fail"
         cherrypy.lib.sessions.expire()
+        
+
+def render_template(template, list_user, message_list):
+    return template.render(user_list=list_user, message_list = message_list)
 
 
-def render_template(template, list_user):
+
+def render_template_user(template, list_user):
     return template.render(user_list=list_user)

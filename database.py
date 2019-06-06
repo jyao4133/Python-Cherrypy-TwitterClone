@@ -1,5 +1,6 @@
 import sqlite3
 import urllib
+import time
 import json
 
 def createDB_userlist():
@@ -62,9 +63,12 @@ def get_broadcast_messages():
     messages = c.fetchall()
     message_list = []
     for message in messages:
-        temp_dict = {'pubkey' : message[0], 'message' : message[1], 'sender_created_at' : message[2], 'loginserver_record' : message[3], 'signature' : message[4]}
+        message_user = message[3].split(',')[0]
+        print(float(message[2]))
+        float_time = float(message[2])
+        real_time = time.ctime(float_time)
+        temp_dict = {'pubkey' : message[0], 'message' : message[1], 'sender_created_at' : real_time, 'loginserver_record' : message_user, 'signature' : message[4]}
         message_list.append(temp_dict)
-    print(message_list)
 
     return message_list
 
