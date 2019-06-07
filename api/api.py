@@ -40,4 +40,18 @@ class Api(object):
         return payload
 
 
+    @cherrypy.expose
+    @cherrypy.tools.json_in()
+    def ping_check(self):
+
+        payload = {'response' : "ok",
+                    'my_time' : str(time.time())}
+        payload = json.dumps(payload).encode('utf-8')
+        data = cherrypy.request.json
+
+        return payload
+
+
+
+       
         

@@ -49,6 +49,8 @@ print(pubkey_bytes)
 
 privkey = b"243b3d9c9eff76b437d74cb742ec9038c76e15e1b6244644f8f1aa8c670f10d1"
 signing_key = nacl.signing.SigningKey(privkey, encoder=nacl.encoding.HexEncoder)
+
+print(signing_key)
 verify_key = signing_key.verify_key
 print(verify_key)
 message = bytes("Hello", 'utf-8')

@@ -29,7 +29,6 @@ def createDB_messagedata():
     c = conn.cursor()
     #create table
     c.execute("""CREATE TABLE IF NOT EXISTS messages (
-                pubkey TEXT,
                 message TEXT,
                 time TEXT,
                 loginrecord TEXT,
@@ -84,8 +83,8 @@ def addtoDB_user(dict):
 def addtoDB_broadcast(dict):
     conn = sqlite3.connect('message.db')
     c = conn.cursor()
-    message_list = [dict['pubkey'],dict['message'],dict['sender_created_at'],dict['loginserver_record'],dict['signature']]
-    c.execute("INSERT INTO messages VALUES (?,?,?,?,?)", message_list)
+    message_list = [dict['message'],dict['sender_created_at'],dict['loginserver_record'],dict['signature']]
+    c.execute("INSERT INTO messages VALUES (?,?,?,?)", message_list)
     conn.commit()
     conn.close()
     messages = get_broadcast_messages()
@@ -118,10 +117,14 @@ def get_broadcast_messages():
     messages = c.fetchall()
     message_list = []
     for message in messages:
-        message_user = message[3].split(',')[0]
-        float_time = float(message[2])
-        real_time = time.ctime(float_time)
-        temp_dict = {'pubkey' : message[0], 'message' : message[1], 'sender_created_at' : real_time, 'loginserver_record' : message_user, 'signature' : message[4]}
+        message_user = message[2].split(',')[0]
+        try:
+            float_time = float(message[1])
+            real_time = time.ctime(float_time)
+        except KeyError:
+            real_time = "Undefined time"
+            
+        temp_dict = {'message' : message[0], 'sender_created_at' : real_time, 'loginserver_record' : message_user, 'signature' : message[3]}
         message_list.append(temp_dict)
 
     return message_list

@@ -41,11 +41,30 @@ function show_new_users() {
     
 }
 
-
+function pollping() {
+    
+    var xhttp = new XMLHttpRequest();
+	xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            try{
+                var obj = JSON.parse(this.response);
+                var obj2 = JSON.parse(obj);
+                document.getElementById("nothing").innerHTML = obj2.data;
+            } catch(e){
+                console.log("Errrorr");
+    
+            }
+            }
+        };    
+    xhttp.open("GET", "poll", true);
+    xhttp.timeout = 7000;
+    xhttp.send(null); 
+}
 
 show_new_broadcasts()
 show_new_users()
-
+pollping()
 
 var myVar = setInterval(show_new_broadcasts, 7000);
-var myVar2 = setInterval(show_new_users, 7000);
+var myVar2 = setInterval(show_new_users, 30000);
+var myVar3 = setInterval(pollping, 20000)

@@ -13,14 +13,14 @@ from jinja2 import FileSystemLoader
 import nacl.utils
 import nacl.secret
 import nacl.pwhash
-
+import threading
 import database
 env = Environment(loader=FileSystemLoader('static'), autoescape=True)
 startHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/example.css' /></head><body>"
 pageHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/flex.css' /></head><body>"
 pmHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/privatemessage.css' /></head><body>"
 
-database.createDB_messagedata()
+database.createDB_userlist()
 database.createDB_pmdata()
 database.createDB_senderdata()
 database.createDB_messagedata()
@@ -59,7 +59,6 @@ class MainApp(object):
             report(cherrypy.session['username'],cherrypy.session['password'])
             test = decrypt_privdata()
             send_dict = json.dumps(user_list)
-            print(user_list)
             broadcasts = database.get_broadcast_messages()
             template = env.get_template('broadcastmessage.html')
             htmldict = render_template(template, user_list, broadcasts)
@@ -71,18 +70,35 @@ class MainApp(object):
     @cherrypy.expose
     def showusers(self):
         user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
+
         template = env.get_template('userlist.html')
         htmldict = render_template_user(template, user_list)
         dict_html = {"data" : htmldict}
         dict_dump = json.dumps(dict_html)
+
         return dict_dump
 
+    @cherrypy.tools.json_out()
+    @cherrypy.expose
+    def poll(self):
+        user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
+
+        for user in user_list:
+            ip = user['connection_address'] 
+            thread = threading.Thread(target=ping_check, args=(cherrypy.session['username'],cherrypy.session['password'],ip,cherrypy.session['external_ip']))
+            thread.start()       
+        dict_html = {"data" : ""}
+        dict_dump = json.dumps(dict_html)
+        print(ip)
+        return dict_dump
 
     @cherrypy.tools.json_out()
     @cherrypy.expose
     def showpms(self):
         user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
         template = env.get_template('pm.html')
+        report(cherrypy.session['username'],cherrypy.session['password'])
+
         pms = database.get_pms(cherrypy.session['username'],cherrypy.session['signing_key'])
         empty_list = []
         for person in pms:
@@ -93,25 +109,31 @@ class MainApp(object):
         dict_dump = json.dumps(dict_html)
         return dict_dump
 
+
     # PAGES (which return HTML that can be viewed in browser)
     @cherrypy.expose
     def index(self):    
         Page = startHTML
-        try:
+        cherrypy.session['external_ip'] = get_ownip()+":"+"8000"
 
+        try:
             user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
             report(cherrypy.session['username'],cherrypy.session['password'])
             test = decrypt_privdata()
             send_dict = json.dumps(user_list)
             broadcasts = database.get_broadcast_messages()
             template = env.get_template('login.html')
-            htmldict = render_template(template, user_list, broadcasts)
+            filter_list = []
+            if(cherrypy.session['filter'] == "on"):
+                for broadcast in broadcasts:
+                    if (cherrypy.session['temp_person'] == broadcast['loginserver_record']):
+                        filter_list.append(broadcast)
+            htmldict = render_templates(template, user_list, broadcasts,filter_list)
             Page = pageHTML
-
-                        
+   
+       
             Page += htmldict
-            print("db pms:")
-            print(database.get_pms(cherrypy.session['username'],cherrypy.session['signing_key']))
+
             return Page
                          
 
@@ -124,20 +146,17 @@ class MainApp(object):
                         </form>
                         </div>
                     </div>'''
-
+            
             return Page
         
     @cherrypy.expose
     def broadcast_box(self):
 
         try:
-            Page = startHTML + "You can broadcast a message to the cohort here<br/>"
+            template = env.get_template('broadcastbox.html')
+            htmld = single_render(template)
+            Page = htmld
 
-            Page += '<form action="/get_broadcast" method="post" enctype="multipart/form-data">'
-
-            Page += 'broadcast: <input type="text" name="broadcast"/><br/>'
-            Page += '<input type="submit" value="broadcast"/></form>'
-        
 
         except KeyError:
             Page = startHTML + "You have not logged in, please login!<br/>"
@@ -148,14 +167,19 @@ class MainApp(object):
         try:
             Page = startHTML + "Successfully broadcast a message<br/>"
             cherrypy.session['broadcast'] = broadcast
-            print(cherrypy.session['broadcast'])
             poll = list_users(cherrypy.session['username'],cherrypy.session['password'])
+
+            ts = time.time()
+            record = cherrypy.session['loginserver_record']
+            message_bytes = bytes(record + cherrypy.session['broadcast'] + str(ts), encoding='utf-8')
+            signed = cherrypy.session['signing_key'].sign(message_bytes, encoder=nacl.encoding.HexEncoder)
+            signature_hex_str = signed.signature.decode('utf-8')
+
             for user in poll:
                 ip = user['connection_address'] 
-                if (ip == "http://192.168.1.564:8000"):
-                    print ("don't send to yourself")
-                else:    
-                    send_broadcast(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['broadcast'])
+                thread = threading.Thread(target=send_broadcast, args=(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['broadcast'],ip,record,signature_hex_str))
+                thread.start()                   
+                    #send_broadcast(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['broadcast'])
             Page += "Click here to return to the title <a href='/'>page</a>."
 
         except KeyError:
@@ -165,12 +189,10 @@ class MainApp(object):
     @cherrypy.expose
     def receiver_box(self):
         try:
-            Page = startHTML + "Enter the username of the person you want to send to, or see the previous history. here<br/>"
-            Page += "You won't send a message unless the person is online. Check the online people on the right side!"
-            Page += '<form action="/privatemessage_box" method="post" enctype="multipart/form-data">'
-
-            Page += 'Username: <input type="text" name="Username"/><br/>'
-            Page += '<input type="submit" value="submit"/></form>'
+            
+            template = env.get_template('receivebox.html')
+            htmld = single_render(template)
+            Page = htmld
 
 
         except KeyError:
@@ -221,9 +243,7 @@ class MainApp(object):
     @cherrypy.expose
     def send_privatemessage(self, Message = None):
         try:
-            print(cherrypy.session['signing_key'])
             cherrypy.session['message'] = Message
-            print(cherrypy.session['message'])
             send_privatemessage(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['message'])
             payload = {
                 'message' : cherrypy.session['message'],
@@ -240,22 +260,19 @@ class MainApp(object):
 
     @cherrypy.expose
     def login(self, bad_attempt = 0, *vars, **kwargs):
+        cherrypy.session['filter'] = "off"
         Page = startHTML 
+        cherrypy.session['block_broadcasts'] = []
         if bad_attempt != 0:
             Page += "<font color='red'>Invalid username/password!</font>"
 
 
+        template = env.get_template('firstpage.html')
+        
+        htmld = single_render(template)
+        Page += htmld
 
-        Page += '''<div class="login-page">
-                    <div class="form">
-                        '<form action="/signin" method="post" enctype="multipart/form-data">'
-                        <input type="text" name="username" placeholder="username"/>
-                        <input type="text" name="password" placeholder="password"/>
-                        <input type="text" name="password2" placeholder="password2"/>
-                        <button>login</button>
-                        'New private data(This will overwrite your previous data): <input type="checkbox" name="overwrite"/><br/>'
-                    </div>
-                    </div>'''
+
         
         return Page
     
@@ -268,7 +285,6 @@ class MainApp(object):
     @cherrypy.expose
     def signin(self, username=None, password=None, password2 = None, overwrite = None):
         """Check their name and password and send them either to the main page, or back to the main login screen."""
-        print(overwrite)
 
         cherrypy.session['username'] = username
         cherrypy.session['password'] = password
@@ -307,6 +323,25 @@ class MainApp(object):
             cherrypy.lib.sessions.expire()
         raise cherrypy.HTTPRedirect('/')
 
+    @cherrypy.expose
+    def away(self):
+        cherrypy.session['status'] = "away"
+        raise cherrypy.HTTPRedirect('/')
+
+    @cherrypy.expose
+    def online(self):
+        cherrypy.session['status'] = "online"
+        raise cherrypy.HTTPRedirect('/')
+
+    @cherrypy.expose
+    def block_user(self, Message = None):
+        print(Message)
+        person = Message
+        cherrypy.session['temp_person'] = person
+        print(cherrypy.session['temp_person'])
+        cherrypy.session['filter'] = "on"
+        raise cherrypy.HTTPRedirect('/')
+
 
 ###
 ### Functions only after here
@@ -325,7 +360,6 @@ def pubAuth():
     hex_key_str = hex_key.decode("utf-8")
     cherrypy.session['new_privkey'] = hex_key_str
     
-    print(hex_key_str)
 
 
 # Sign a message with the signing key
@@ -474,8 +508,8 @@ def report(username, password):
 
     payload = {
         "incoming_pubkey" : cherrypy.session['pubkey'],
-        "connection_address" : "172.23.54.164:8000",
-        "connection_location" : "2",
+        "connection_address" : cherrypy.session['external_ip'],
+        "connection_location" : 2,
         "status" : cherrypy.session['status']
         
     }
@@ -503,7 +537,6 @@ def check_key(username, password):
         if (private_data_dict['prikeys'][0] == ""):
             pubAuth()
             cherrypy.session['privatekey'] = private_data_dict['prikeys'][0]
-            print(cherrypy.session['privatekey'])
                     #decode private signing key
             hex_key = bytes(cherrypy.session['privatekey'] , 'utf-8')
             hex_key_str = cherrypy.session['privatekey']
@@ -518,7 +551,6 @@ def check_key(username, password):
 
         else:
             cherrypy.session['privatekey'] = private_data_dict['prikeys'][0]
-            print(cherrypy.session['privatekey'])
                     #decode private signing key
             hex_key = bytes(cherrypy.session['privatekey'] , 'utf-8')
             hex_key_str = cherrypy.session['privatekey']
@@ -535,19 +567,11 @@ def check_key(username, password):
      
 
 
-def send_broadcast(username,password,message):
-    url = "http://192.168.1.64:8000/api/rx_broadcast"
-    # Generate a new random signing key
+def send_broadcast(username,password,message,ip,record,signature_hex_str):
+    url = "http://"+ip+"/api/rx_broadcast"
+    # Generate a new random signing key 
+    print(ip)
     ts = time.time()
-    get_record(username,password)
-    record = cherrypy.session['loginserver_record']
-    message_bytes = bytes(record + message + str(ts), encoding='utf-8')
-
-    signed = cherrypy.session['signing_key'].sign(message_bytes, encoder=nacl.encoding.HexEncoder)
-    signature_hex_str = signed.signature.decode('utf-8')
-
-
-
     #create HTTP BASIC authorization header
     credentials = ('%s:%s' % (username, password))
     b64_credentials = base64.b64encode(credentials.encode('ascii'))
@@ -557,7 +581,6 @@ def send_broadcast(username,password,message):
     }
 
     payload = {
-        "pubkey" : cherrypy.session['pubkey'],
         "message" : message,
         "sender_created_at" : str(ts),
         "loginserver_record" : record,   
@@ -628,12 +651,10 @@ def list_users(username, password):
     return JSON_object['users']
 
 def send_privatemessage(username, password, message):
-        url = "http://cs302.kiwi.land/api/rx_privatemessage"
+        url = "http://e7871110.ngrok.io/api/rx_privatemessage"
 
         userlist = list_users(username, password)
         for person in userlist:
-            print(person['username'])
-            print(cherrypy.session['private_username'])
 
             if (person['username'] == cherrypy.session['private_username']):
                 target_pubkey = person['incoming_pubkey']
@@ -676,11 +697,12 @@ def send_privatemessage(username, password, message):
             data = response.read() # read the received bytes
             encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
             response.close()
+            
+            JSON_object = json.loads(data.decode(encoding))
+            print(JSON_object)
         except urllib.error.HTTPError as error:
             print(error.read())
 
-        JSON_object = json.loads(data.decode(encoding))
-        print(JSON_object)
 
 def add_privdata(username, password, password2):
     
@@ -731,7 +753,6 @@ def add_privdata(username, password, password2):
         'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
         'Content-Type' : 'application/json; charset=utf-8',
     }
-    print(cherrypy.session['loginserver_record'])
 
     payload = {
         "privatedata" : data,
@@ -768,25 +789,68 @@ def decrypt_privdata():
 
         plaintext = box.decrypt(decode_data)
         cherrypy.session['failflag'] = "pass"
-        print(plaintext)
+
         return plaintext
     except nacl.exceptions.CryptoError:
         raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
         cherrypy.session['failflag'] = "fail"
         cherrypy.lib.sessions.expire()
         
+def ping_check(username, password,ip,curr_ip):
+    url = "http://" + ip + "/api/ping_check"
+    credentials = ('%s:%s' % (username, password))
+    b64_credentials = base64.b64encode(credentials.encode('ascii'))
+    headers = {
+        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
+        'Content-Type' : 'application/json; charset=utf-8',
+    }
+    payload = {
+        'my_time' : str(time.time()),
+        'connection_address' : curr_ip,
+        'connection_location' : 2
+    }
+    payload = json.dumps(payload).encode('utf-8')
+    try:
+        req = urllib.request.Request(url, data=payload, headers=headers)
+        response = urllib.request.urlopen(req)
+        data = response.read() # read the received bytes
+        encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
+        
+        JSON_object = json.loads(data.decode(encoding))
+        print(JSON_object)
+        response.close()
+    except (urllib.error.HTTPError,urllib.error.URLError,json.decoder.JSONDecodeError) as error:
+        return
+
 
 def render_template(template, list_user, message_list):
     return template.render(user_list=list_user, message_list = message_list)
 
+def render_templates(template, list_user, message_list, filter_list):
+    return template.render(user_list=list_user, message_list = message_list, filter_list=filter_list)
+
 def render_template_pm(template, list_user, message_list, sent_list):
     return template.render(user_list=list_user, message_list = message_list, sent_list = sent_list)
-
-
-
 
 def render_template_user(template, list_user):
     return template.render(user_list=list_user)
 
 def single_render(template):
     return template.render()
+
+def get_ownip():
+    try:
+        url = "https://api.ipify.org/?format=json"
+        ip_req = urllib.request.Request(url=url)
+        response = urllib.request.urlopen(ip_req)
+        data = response.read() # read the received bytes
+        encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
+        response.close()
+        ip_list = json.loads(data.decode(encoding))
+        if 'ip' in ip_list:
+            ip = ip_list['ip']
+        return ip
+    except urllib.error.URLError as e:
+        print(e)
+
+

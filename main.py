@@ -19,7 +19,7 @@ import server
 
 import api.api
 # The address we listen for connections onw
-LISTEN_IP = "192.168.1.64"
+LISTEN_IP = "192.168.1.74"
 LISTEN_PORT = 8000
 
 def runMainApp():
@@ -77,7 +77,6 @@ def runMainApp():
     
     # Start the web server
     cherrypy.engine.start()
-
     # And stop doing anything else. Let the web server take over.
     cherrypy.engine.block()
  

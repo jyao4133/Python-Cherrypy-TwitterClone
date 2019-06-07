@@ -72,12 +72,12 @@ li a:hover {
   }
 
 ul.broadcast-style {
-    display:inline-flex;
-    flex-direction: row;
-    max-width: 50%;
-    list-style-type: none;    
-    margin-left: 300px;
-    margin-top: 0px;
+  display:inline-flex;
+  flex-direction: column;
+  max-width: 50%;
+  list-style-type: none;    
+  margin-left: 300px;
+  margin-top: 0px;
 }
 li.broadcast-style {
   border:1px solid black;
@@ -86,10 +86,10 @@ li.broadcast-style {
 
 }
 
-#demo {
+#sent {
   display:inline-flex;
-
-  margin-left: 0px;
+  flex-direction: column;
+  margin-left: 200px;
   margin-top: -200px;
 }
 

@@ -1,0 +1,21 @@
+<link rel="stylesheet" type="text/css" href="static/flex.css">
+<body><header><h1><ul class="my-list-style">
+                        <li class="my-list-style"><a href='/'>Home</a></li>
+                        <li class="my-list-style"><a href='broadcast_box'>public broadcast</a></li>
+                        <li class="my-list-style"><a href='receiver_box'>private message</a></li>
+                        <li class="my-list-style"><a href='online'>Online</a></li>
+                        <li class="my-list-style"><a href='away'>Away</a></li>
+                        <li class="my-list-style"><a href='signout'>Signout</a></li>
+                        </ul></header></body><h1>
+
+
+
+
+
+
+<div id="inputstuff">
+You can broadcast a message to the cohort here<br/>
+<form action="/get_broadcast" method="post" enctype="multipart/form-data">
+broadcast: <input type="text" name="broadcast"/><br/>
+<input type="submit" value="broadcast"/></form>
+</div>

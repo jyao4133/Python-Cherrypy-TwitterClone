@@ -3,7 +3,9 @@
                         <li class="my-list-style"><a href='/'>Home</a></li>
                         <li class="my-list-style"><a href='broadcast_box'>public broadcast</a></li>
                         <li class="my-list-style"><a href='receiver_box'>private message</a></li>
-                        <li class="my-list-style"><a href='create_group'>group message</a></li>
+                        <li class="my-list-style"><a href='online'>Online</a></li>
+                        <li class="my-list-style"><a href='away'>Away</a></li>
+                        <li class="my-list-style"><a href='signout'>signout</a></li>
                         </ul></header></body>
 
 
@@ -16,7 +18,7 @@ Message: <input type="text" name="Message" size="90"/><br/>
 
 <div id="receive">
 
-<ul class="broadcast-style">
+<ul class="list-style">
     <h3>Message you have receieved from this user:</h3>
     {% for broadcast in message_list%}
         <li class="broadcast-style">{{broadcast['encrypted_message']}}
