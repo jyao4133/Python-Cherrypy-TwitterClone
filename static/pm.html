@@ -1,0 +1,7 @@
+<ul class="box-style">
+    <h3>Message you have receieved from this user:</h3>
+    {% for broadcast in message_list%}
+        <li class="broadcast-style">{{broadcast['encrypted_message']}}
+        <p>{{broadcast['sender']}} Sent at:{{broadcast['sender_created_at']}}</p></li>
+    {% endfor %}
+</ul>

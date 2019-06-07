@@ -18,7 +18,12 @@ import database
 env = Environment(loader=FileSystemLoader('static'), autoescape=True)
 startHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/example.css' /></head><body>"
 pageHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/flex.css' /></head><body>"
-timelineHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/timeline.css' /></head><body>"
+pmHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/privatemessage.css' /></head><body>"
+
+database.createDB_messagedata()
+database.createDB_pmdata()
+database.createDB_senderdata()
+database.createDB_messagedata()
 class MainApp(object):
 
     #CherryPy Configuration
@@ -60,7 +65,6 @@ class MainApp(object):
             htmldict = render_template(template, user_list, broadcasts)
             dict_html = {"data" : htmldict}
             dict_dump = json.dumps(dict_html)
-            print(htmldict)
             return dict_dump
 
     @cherrypy.tools.json_out()
@@ -73,26 +77,32 @@ class MainApp(object):
         dict_dump = json.dumps(dict_html)
         return dict_dump
 
+
+    @cherrypy.tools.json_out()
+    @cherrypy.expose
+    def showpms(self):
+        user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
+        template = env.get_template('pm.html')
+        pms = database.get_pms(cherrypy.session['username'],cherrypy.session['signing_key'])
+        empty_list = []
+        for person in pms:
+            if (person['sender'] == cherrypy.session['private_username']):
+                empty_list.append(person)
+        htmldict = render_template(template, user_list,empty_list)
+        dict_html = {"data" : htmldict}
+        dict_dump = json.dumps(dict_html)
+        return dict_dump
+
     # PAGES (which return HTML that can be viewed in browser)
     @cherrypy.expose
     def index(self):    
         Page = startHTML
         try:
-            
-            
-            
-          #  Page += "Hello " + cherrypy.session['username'] + "!<br/>"
-          #  Page += "Here is some bonus text because you've logged in! <a href='/signout'>Sign out</a><br/>"
-          #  Page += 'Public message: <input type="text" name="Broadcast Message"/><br/>'
-          #  Page += '<input type="submit" value="Submit Broadcast"/></form>'
-          #  Page += "click here to post a <a href='broadcast_box'>public broadcast</a>.<br/>" 
-          #  Page += "click here to send a <a href='receiver_box'>private message</a>.<br/>"
-          #  Page += "click here to <a href='signout'>sign out</a>.<br/>"
+
             user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
             report(cherrypy.session['username'],cherrypy.session['password'])
             test = decrypt_privdata()
             send_dict = json.dumps(user_list)
-            print(user_list)
             broadcasts = database.get_broadcast_messages()
             template = env.get_template('login.html')
             htmldict = render_template(template, user_list, broadcasts)
@@ -100,7 +110,8 @@ class MainApp(object):
 
                         
             Page += htmldict
-
+            print("db pms:")
+            print(database.get_pms(cherrypy.session['username'],cherrypy.session['signing_key']))
             return Page
                          
 
@@ -141,10 +152,10 @@ class MainApp(object):
             poll = list_users(cherrypy.session['username'],cherrypy.session['password'])
             for user in poll:
                 ip = user['connection_address'] 
-                if (ip == "http://192.168.1.64:8000"):
+                if (ip == "http://192.168.1.564:8000"):
                     print ("don't send to yourself")
                 else:    
-                    send_broadcast(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['broadcast'], ip)
+                    send_broadcast(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['broadcast'])
             Page += "Click here to return to the title <a href='/'>page</a>."
 
         except KeyError:
@@ -154,13 +165,13 @@ class MainApp(object):
     @cherrypy.expose
     def receiver_box(self):
         try:
-            Page = startHTML + "Enter the username of the person you want to send to. here<br/>"
+            Page = startHTML + "Enter the username of the person you want to send to, or see the previous history. here<br/>"
             Page += "You won't send a message unless the person is online. Check the online people on the right side!"
             Page += '<form action="/privatemessage_box" method="post" enctype="multipart/form-data">'
 
             Page += 'Username: <input type="text" name="Username"/><br/>'
             Page += '<input type="submit" value="submit"/></form>'
-        
+
 
         except KeyError:
             Page = startHTML + "You have not logged in, please login!<br/>"
@@ -170,21 +181,35 @@ class MainApp(object):
     @cherrypy.expose
     def privatemessage_box(self, Username = None):
         try:
-            Page = startHTML + "Please enter the message you want to send<br/>"
+            Page = pmHTML
             cherrypy.session['private_username'] = Username
-            print (cherrypy.session['private_username'])
             online_bool = False
             poll = list_users(cherrypy.session['username'],cherrypy.session['password'])
             for person in poll:
                 if (person['username'] == cherrypy.session['private_username']):
                     online_bool = True
-            if (online_bool == True):
-                Page += '<form action="/send_privatemessage" method="post" enctype="multipart/form-data">'
 
-                Page += 'Message: <input type="text" name="Message"/><br/>'
-                Page += '<input type="submit" value="Ok"/></form>'
-            
-            else:
+            template = env.get_template('privatemessage.html')
+            pms = database.get_pms(cherrypy.session['username'],cherrypy.session['signing_key'])
+            sent_pms = database.get_sentpms(cherrypy.session['private_username'])
+
+            empty_list = []
+            empty_pm = []
+
+            #filter for received pms (don't want to show everything)
+            for person in pms:
+                if (person['sender'] == cherrypy.session['private_username']):
+                    empty_list.append(person)
+
+            #filter for sent pms to specific person (don't want to show everything)
+            for person in sent_pms:
+                if (person['sender'] == cherrypy.session['username']):
+                    empty_pm.append(person)
+            htmldict = render_template_pm(template, poll, empty_list, empty_pm)
+            Page = pmHTML
+            Page += htmldict
+
+            if (online_bool == False):
                 Page = startHTML + "The person you have entered is not online or does not exist!<br/>"
                 Page += "Click here to return to  <a href='/receiver_box'>try again</a>."
                 
@@ -196,14 +221,18 @@ class MainApp(object):
     @cherrypy.expose
     def send_privatemessage(self, Message = None):
         try:
-
-
-            Page = startHTML + "Successfully sent a private message<br/>"
+            print(cherrypy.session['signing_key'])
             cherrypy.session['message'] = Message
             print(cherrypy.session['message'])
             send_privatemessage(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['message'])
-            Page += "Click here to return to the title <a href='/'>page</a>."
-            
+            payload = {
+                'message' : cherrypy.session['message'],
+                'sender_created_at' : str(time.time()),
+                'target_username' : cherrypy.session['private_username'],
+                'current_username' : cherrypy.session['username']
+            }
+            database.addtoDB_sentpms(payload)
+            raise cherrypy.HTTPRedirect('/privatemessage_box?Username=' + cherrypy.session['private_username'])
         except KeyError:
             Page = startHTML + "Oops something went wrong<br/>"
         return Page
@@ -343,7 +372,6 @@ def pubAuth():
         response.close()
     except urllib.error.HTTPError as error:
         print(error.read())
-        exit()
 
     JSON_object = json.loads(data.decode(encoding))
     print(JSON_object)
@@ -399,7 +427,6 @@ def ping(username, password):
         response.close()
     except urllib.error.HTTPError as error:
         print(error.read())
-        exit()
 
     JSON_object = json.loads(data.decode(encoding))
     print(JSON_object)
@@ -461,7 +488,6 @@ def report(username, password):
         response.close()
     except urllib.error.HTTPError as error:
         print(error.read())
-        exit()
 
     JSON_object = json.loads(data.decode(encoding))
     print(JSON_object)
@@ -509,8 +535,8 @@ def check_key(username, password):
      
 
 
-def send_broadcast(username,password,message,ip):
-    url = "http://" + ip + "/api/rx_broadcast"
+def send_broadcast(username,password,message):
+    url = "http://192.168.1.64:8000/api/rx_broadcast"
     # Generate a new random signing key
     ts = time.time()
     get_record(username,password)
@@ -575,7 +601,6 @@ def get_record(username, password):
         response.close()
     except urllib.error.HTTPError as error:
         print(error.read())
-        exit()
 
     JSON_object = json.loads(data.decode(encoding))
     cherrypy.session['loginserver_record'] = JSON_object['loginserver_record']
@@ -597,7 +622,6 @@ def list_users(username, password):
         response.close()
     except urllib.error.HTTPError as error:
         print(error.read())
-        exit()
 
     JSON_object = json.loads(data.decode(encoding))
 
@@ -622,7 +646,6 @@ def send_privatemessage(username, password, message):
         sealed_box = nacl.public.SealedBox(publickey)
         encrypted = sealed_box.encrypt(message, encoder=nacl.encoding.HexEncoder)
         message_en = encrypted.decode('utf-8')
-
         ts = str(time.time())
 
         message_bytes = bytes(cherrypy.session['loginserver_record'] + target_pubkey + cherrypy.session['private_username'] + message_en + str(ts), encoding='utf-8')
@@ -655,7 +678,6 @@ def send_privatemessage(username, password, message):
             response.close()
         except urllib.error.HTTPError as error:
             print(error.read())
-            exit()
 
         JSON_object = json.loads(data.decode(encoding))
         print(JSON_object)
@@ -726,7 +748,6 @@ def add_privdata(username, password, password2):
         response.close()
     except urllib.error.HTTPError as error:
         print(error.read())
-        exit()
 
     JSON_object = json.loads(data.decode(encoding))
     print(JSON_object)
@@ -747,6 +768,7 @@ def decrypt_privdata():
 
         plaintext = box.decrypt(decode_data)
         cherrypy.session['failflag'] = "pass"
+        print(plaintext)
         return plaintext
     except nacl.exceptions.CryptoError:
         raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
@@ -757,7 +779,14 @@ def decrypt_privdata():
 def render_template(template, list_user, message_list):
     return template.render(user_list=list_user, message_list = message_list)
 
+def render_template_pm(template, list_user, message_list, sent_list):
+    return template.render(user_list=list_user, message_list = message_list, sent_list = sent_list)
+
+
 
 
 def render_template_user(template, list_user):
     return template.render(user_list=list_user)
+
+def single_render(template):
+    return template.render()

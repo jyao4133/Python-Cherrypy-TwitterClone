@@ -28,7 +28,6 @@ class Api(object):
         payload = json.dumps(payload).encode('utf-8')
         data = cherrypy.request.json
         database.addtoDB_broadcast(data)
-        print(data)
         return payload
 
     @cherrypy.expose
@@ -37,8 +36,7 @@ class Api(object):
         payload = {'response' : "ok"}
         payload = json.dumps(payload).encode('utf-8')
         data = cherrypy.request.json
-
-        print(data)
+        database.addtoDB_pms(data)
         return payload
 
 

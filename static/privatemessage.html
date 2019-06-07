@@ -1,0 +1,43 @@
+<link rel="stylesheet" type="text/css" href="static/privatemessage.css">
+<body><header><h1><ul class="my-list-style">
+                        <li class="my-list-style"><a href='/'>Home</a></li>
+                        <li class="my-list-style"><a href='broadcast_box'>public broadcast</a></li>
+                        <li class="my-list-style"><a href='receiver_box'>private message</a></li>
+                        <li class="my-list-style"><a href='create_group'>group message</a></li>
+                        </ul></header></body>
+
+
+<h2>
+<form action="/send_privatemessage" method="post" enctype="multipart/form-data">
+Message: <input type="text" name="Message" size="90"/><br/>
+<input type="submit" value="Send message"/></form>
+</h2>
+
+
+<div id="receive">
+
+<ul class="broadcast-style">
+    <h3>Message you have receieved from this user:</h3>
+    {% for broadcast in message_list%}
+        <li class="broadcast-style">{{broadcast['encrypted_message']}}
+        <p>{{broadcast['sender']}} Sent at:{{broadcast['sender_created_at']}}</p></li>
+    {% endfor %}
+</ul>
+
+</div>
+
+<div id="sent">
+
+<ul class="broadcast-style">
+    <h3>Message you have sent to this user:</h3>
+    {% for broadcast in sent_list%}
+        <li class="broadcast-style">{{broadcast['message']}}
+        <p>{{broadcast['sender']}} Sent at:{{broadcast['sender_created_at']}}</p></li>
+    {% endfor %}
+</ul>
+
+</div>
+
+
+<script src="/static/pm.js">
+</script>

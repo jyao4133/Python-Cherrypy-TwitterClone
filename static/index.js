@@ -40,8 +40,12 @@ function show_new_users() {
     xhttp.send(null); 
     
 }
+
+
+
 show_new_broadcasts()
 show_new_users()
+
 
 var myVar = setInterval(show_new_broadcasts, 7000);
 var myVar2 = setInterval(show_new_users, 7000);
