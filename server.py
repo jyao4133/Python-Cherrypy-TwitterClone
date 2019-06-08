@@ -14,6 +14,7 @@ import nacl.utils
 import nacl.secret
 import nacl.pwhash
 import threading
+import main
 import database
 env = Environment(loader=FileSystemLoader('static'), autoescape=True)
 startHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/example.css' /></head><body>"
@@ -266,7 +267,7 @@ class MainApp(object):
         if bad_attempt != 0:
             Page += "<font color='red'>Invalid username/password!</font>"
 
-
+        cherrypy.session['local_ip'] = main.get_ip_address() + ":" + "8000"
         template = env.get_template('firstpage.html')
         
         htmld = single_render(template)
@@ -505,10 +506,10 @@ def report(username, password):
         'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
         'Content-Type' : 'application/json; charset=utf-8',
     }
-
+    #cherrypy.session['external_ip']
     payload = {
         "incoming_pubkey" : cherrypy.session['pubkey'],
-        "connection_address" : cherrypy.session['external_ip'],
+        "connection_address" : cherrypy.session['local_ip'],
         "connection_location" : 2,
         "status" : cherrypy.session['status']
         
@@ -651,16 +652,23 @@ def list_users(username, password):
     return JSON_object['users']
 
 def send_privatemessage(username, password, message):
-        url = "http://e7871110.ngrok.io/api/rx_privatemessage"
+
+        
 
         userlist = list_users(username, password)
+
         for person in userlist:
 
             if (person['username'] == cherrypy.session['private_username']):
                 target_pubkey = person['incoming_pubkey']
                 target_pubkey_bytes = bytes(target_pubkey, 'utf-8')
-
-
+                thisip = person['connection_address']
+                if(cherrypy.session['private_username'] == "admin"):
+                    thisip = "cs302.kiwi.land"
+                    
+                print("PM IP IS")
+                print(thisip)
+        url = "http://"+thisip+"/api/rx_privatemessage"
         message = bytes(cherrypy.session['message'], 'utf-8')
         verifykey = nacl.signing.VerifyKey(target_pubkey_bytes, encoder=nacl.encoding.HexEncoder)
         publickey = verifykey.to_curve25519_public_key()

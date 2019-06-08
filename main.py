@@ -16,10 +16,17 @@ import cherrypy
 
 import server
 
-
+import socket
 import api.api
+
+#return socket IP
+
+def get_ip_address():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    return s.getsockname()[0]
 # The address we listen for connections onw
-LISTEN_IP = "192.168.1.74"
+LISTEN_IP = get_ip_address()
 LISTEN_PORT = 8000
 
 def runMainApp():
