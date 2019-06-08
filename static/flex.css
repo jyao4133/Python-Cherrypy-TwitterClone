@@ -88,7 +88,8 @@ padding:0.3em;
 
 #demo {
 display:inline-flex;
-
+max-width:50%;
+overflow:scroll;
 margin-left: 0px;
 margin-top: -200px;
 }
@@ -102,7 +103,8 @@ margin-left: 0px;
 #blockbox {
 display:inline-flex;
 flex-direction: column;
-max-width: 50%;
+max-width: 40%;
+overflow:scroll;
 list-style-type: none;   
 margin-left: 0px;
 margin-top: -200px;

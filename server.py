@@ -86,6 +86,8 @@ class MainApp(object):
 
         for user in user_list:
             ip = user['connection_address'] 
+            if (user['username'] == "admin"):
+                ip="cs302.kiwi.land"
             thread = threading.Thread(target=ping_check, args=(cherrypy.session['username'],cherrypy.session['password'],ip,cherrypy.session['external_ip']))
             thread.start()       
         dict_html = {"data" : ""}
@@ -179,8 +181,9 @@ class MainApp(object):
             for user in poll:
                 ip = user['connection_address'] 
                 thread = threading.Thread(target=send_broadcast, args=(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['broadcast'],ip,record,signature_hex_str))
-                thread.start()                   
-                    #send_broadcast(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['broadcast'])
+                thread.start()          
+    
+            send_broadcast_login(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['broadcast'])
             Page += "Click here to return to the title <a href='/'>page</a>."
 
         except KeyError:
@@ -293,6 +296,7 @@ class MainApp(object):
         if (overwrite == "on"):
             pubAuth()
             add_privdata(username, password, password2)
+        
         check_key(username, password)
 
         error = authoriseUserLogin(username, password)  
@@ -534,7 +538,9 @@ def check_key(username, password):
         private_data_dict = private_data['privatedata']
         cherrypy.session['encrypted_priv']=private_data_dict
         private_data_dict = decrypt_privdata()
-        private_data_dict = json.loads(private_data_dict)
+        print(private_data_dict)
+        private_data_dict = json.loads(private_data_dict.decode('utf-8'))
+        print(private_data_dict)
         if (private_data_dict['prikeys'][0] == ""):
             pubAuth()
             cherrypy.session['privatekey'] = private_data_dict['prikeys'][0]
@@ -566,9 +572,12 @@ def check_key(username, password):
     except KeyError:
         raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
      
+    except TypeError: 
+        raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
 
 
 def send_broadcast(username,password,message,ip,record,signature_hex_str):
+
     url = "http://"+ip+"/api/rx_broadcast"
     # Generate a new random signing key 
     print(ip)
@@ -606,7 +615,43 @@ def send_broadcast(username,password,message,ip,record,signature_hex_str):
     except (urllib.error.HTTPError,urllib.error.URLError,json.decoder.JSONDecodeError) as error:
         return
     
+def send_broadcast_login(username,password,message):
+    url = "http://cs302.kiwi.land/api/rx_broadcast"
+    # Generate a new random signing key 
+    ts = time.time()
+    get_record(username,password)
+    record = cherrypy.session['loginserver_record']
+    message_bytes = bytes(record + message + str(ts), encoding='utf-8')
+    signed = cherrypy.session['signing_key'].sign(message_bytes, encoder=nacl.encoding.HexEncoder)
+    signature_hex_str = signed.signature.decode('utf-8')
+    #create HTTP BASIC authorization header
+    credentials = ('%s:%s' % (username, password))
+    b64_credentials = base64.b64encode(credentials.encode('ascii'))
+    headers = {
+        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
+        'Content-Type' : 'application/json; charset=utf-8',
+    }
 
+    payload = {
+        "message" : message,
+        "sender_created_at" : str(ts),
+        "loginserver_record" : record,   
+        "signature" : signature_hex_str
+    }
+    payload = json.dumps(payload).encode('utf-8')
+
+    try:
+        req = urllib.request.Request(url, data=payload, headers=headers)
+        response = urllib.request.urlopen(req)
+        data = response.read() # read the received bytes
+        encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
+        
+        JSON_object = json.loads(data.decode(encoding))
+        print(JSON_object)
+        response.close()
+    except (urllib.error.HTTPError,urllib.error.URLError,json.decoder.JSONDecodeError) as error:
+        return
+    
 
 def get_record(username, password):
     url = "http://cs302.kiwi.land/api/get_loginserver_record"

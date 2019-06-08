@@ -4,3 +4,19 @@ t.render(something="World")
 
 t = Template("My favorite numbers: {% for n in range(1,10) %}{{n}} " "{% endfor %}")
 t.render()
+
+
+
+
+
+
+
+
+from user in userLIst:
+    send_broadcast(ip)
+
+
+
+from user in userlist:
+    thread.threading(send_broadcast, ip)
+    threadstart
