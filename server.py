@@ -138,7 +138,6 @@ class MainApp(object):
             private_data_dict = private_data['privatedata']
             cherrypy.session['encrypted_priv']=private_data_dict
             private_data_dict = decrypt_privdata()
-            print(private_data_dict)
             private_data_dict = json.loads(private_data_dict.decode('utf-8'))
             cherrypy.session['temp_privdata'] = private_data_dict
             #show broadcasts
@@ -170,13 +169,9 @@ class MainApp(object):
         except KeyError: #There is no username
             cherrypy.session['login_success'] = "fail"
 
-            Page +='''<div class="login-page">
-                    <div class="form">
-                        <button onclick="window.location.href = '/login';">login</button>
-                        </form>
-                        </div>
-                    </div>'''
-
+            template = env.get_template('loginbutton.html')
+            htmld = single_render(template)
+            Page += htmld
             
             return Page
 
@@ -224,6 +219,9 @@ class MainApp(object):
             template = env.get_template('default.html')
             htmld = single_render(template)
             Page += htmld
+        except TypeError:
+            cherrypy.HTTPRedirect('/')
+
         return Page
     #Middleman page
     @cherrypy.expose
@@ -396,7 +394,6 @@ class MainApp(object):
     def block_user(self, Message = None):
         person = Message
         cherrypy.session['temp_person'] = person
-        print(cherrypy.session['temp_person'])
         cherrypy.session['filter'] = "on"
         raise cherrypy.HTTPRedirect('/')
 
@@ -614,7 +611,6 @@ def check_key(username, password):
         private_data_dict = private_data['privatedata']
         cherrypy.session['encrypted_priv']=private_data_dict
         private_data_dict = decrypt_privdata()
-        print(private_data_dict)
         private_data_dict = json.loads(private_data_dict.decode('utf-8'))
         cherrypy.session['temp_privdata'] = private_data_dict
         if (private_data_dict['prikeys'][0] == ""):
@@ -749,6 +745,11 @@ def get_record(username, password):
         cherrypy.session['loginserver_record'] = JSON_object['loginserver_record']
     except urllib.error.HTTPError as error:
         print(error.read())
+    except KeyError:
+        raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
+     
+    except TypeError: 
+        raise cherrypy.HTTPRedirect('/login?bad_attempt=1')    
 
 
 #Calls the list_users api to get everyone who is online    
