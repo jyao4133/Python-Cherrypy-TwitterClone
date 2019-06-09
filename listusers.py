@@ -20,7 +20,7 @@ hex_key = b'37704bcd1690cf848dbca707b02a2b85a918d214785cb8c4b9b1de54faa78d1b'
 # Generate a new random signing key
 #hex_key = nacl.signing.SigningKey.generate().encode(encoder=nacl.encoding.HexEncoder)
 signing_key = nacl.signing.SigningKey(hex_key, encoder=nacl.encoding.HexEncoder)
-print(hex_key)
+print(signing_key)
 
 
 # Sign a message with the signing key

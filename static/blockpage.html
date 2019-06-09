@@ -5,15 +5,14 @@
                         <li class="my-list-style"><a href='receiver_box'>private message</a></li>
                         <li class="my-list-style"><a href='online'>Online</a></li>
                         <li class="my-list-style"><a href='away'>Away</a></li>
-                        <li class="my-list-style"><a href='block'>Block users</a></li>
-
                         <li class="my-list-style"><a href='signout'>Signout</a></li>
-                        </ul></header></body><h1>
-
+</ul></header></body><h1>
 <div id="inputstuff">
-Enter the username of the person you want to send to, or see the previous history. here<br/>
-You won't send a message unless the person is online. Check the online people on the right side!
-<form action="/privatemessage_box" method="post" enctype="multipart/form-data">
-Username: <input type="text" name="Username"/><br/>
-<input type="submit" value="submit"/></form>
+
+<h2>
+<form action="/addto_privatedata" method="post" enctype="multipart/form-data">
+Person that you want to block: <input type="text" name="Message" size="90"/><br/>
+<input type="submit" value="Submit"/></form>
+</h2>
+
 </div>

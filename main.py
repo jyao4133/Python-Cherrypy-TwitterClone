@@ -1,11 +1,14 @@
 #!/usr/bin/python3
 """ main.py
 
-    COMPSYS302 - Software Design - Example Client Webapp
-    Current Author/Maintainer: Hammond Pearce (hammond.pearce@auckland.ac.nz)
-    Last Edited: March 2019
+    COMPSYS302 - Software Design - Web client
+    Current Author/Maintainer: Jason Yao (jyao413@aucklanduni.ac.nz)
+    Last Edited: June 2019
 
     This program uses the CherryPy web server (from www.cherrypy.org).
+    This program is a messaging client that interfaces with other messaging
+    clients. It was made for our client who wanted a private social network.
+    It follows a hybrid communication protocol and is secure and robust
 """
 # Requires:  CherryPy 18.0.1  (www.cherrypy.org)
 #            Python  (We use 3.5.x +)
@@ -19,7 +22,7 @@ import server
 import socket
 import api.api
 
-#return socket IP
+#return socket IP for dynamic IP fetch
 
 def get_ip_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -29,6 +32,7 @@ def get_ip_address():
 LISTEN_IP = get_ip_address()
 LISTEN_PORT = 8000
 
+#Main application to start server and mount server 
 def runMainApp():
     #set up the config
     conf = {
@@ -38,6 +42,7 @@ def runMainApp():
             'tools.encode.encoding': 'utf-8',
             'tools.sessions.on': True,
             'tools.sessions.timeout': 60 * 1, #timeout is in minutes, * 60 to get hours
+
 
             # The default session backend is in RAM. Other options are 'file',
             # 'postgres', 'memcached'. For example, uncomment:
@@ -65,6 +70,7 @@ def runMainApp():
 
     # Create an instance of MainApp and tell Cherrypy to send all requests under / to it. (ie all of them)
     cherrypy.tree.mount(server.MainApp(), "/", conf)
+    # Create an instance of Api to tell Cherrypy to send all requests under /api to it. 
     cherrypy.tree.mount(api.api.Api(), "/api", conf)
 
 
@@ -79,7 +85,7 @@ def runMainApp():
     print("========================================")
     print("             Jason Yao")
     print("         University of Auckland")
-    print("   COMPSYS302 - Example client web app")
+    print("   COMPSYS302 - Twitter client web app")
     print("========================================")                       
     
     # Start the web server

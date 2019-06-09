@@ -1,3 +1,7 @@
+#--------------------------------------------------------------------------------------------------
+#Main python file. Functions and server commands are all used here to do various commands
+#--------------------------------------------------------------------------------------------------
+
 import cherrypy
 import nacl.encoding
 import nacl.signing
@@ -16,11 +20,14 @@ import nacl.pwhash
 import threading
 import main
 import database
-env = Environment(loader=FileSystemLoader('static'), autoescape=True)
-startHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/example.css' /></head><body>"
-pageHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/flex.css' /></head><body>"
-pmHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/privatemessage.css' /></head><body>"
 
+
+env = Environment(loader=FileSystemLoader('static'), autoescape=True)
+startHTML = "<html><head><title>Twitmore</title><link rel='stylesheet' href='/static/example.css' /></head><body>"
+pageHTML = "<html><head><title>Twitmore</title><link rel='stylesheet' href='/static/flex.css' /></head><body>"
+pmHTML = "<html><head><title>Twitmore</title><link rel='stylesheet' href='/static/privatemessage.css' /></head><body>"
+
+#if database doesn't already exist, create them. Otherwise these functions are "do nothing" functions
 database.createDB_userlist()
 database.createDB_pmdata()
 database.createDB_senderdata()
@@ -37,22 +44,14 @@ class MainApp(object):
     @cherrypy.expose
     def default(self, *args, **kwargs):
         """The default page, given when we don't recognise where the request is for."""
-        Page = startHTML + '''<!DOCTYPE html>
-                            <html>
-                            <head>
-                            <link rel='stylesheet' href='/static/example.css' />
-                            </head>
-                            <body>
-                            <header>
-                            <div class="header-block">
-                            <div id="demoFont">Twitmore</div>
-                            </div>
-                            </header>
-                            </body>
-                            </html>'''
+        Page = startHTML 
+        template = env.get_template('default.html')
+        htmld = single_render(template)
+        Page += htmld
+
         cherrypy.response.status = 404
         return Page
-    
+    #Funtion to interface with JS to dynamically refresh page
     @cherrypy.tools.json_out()
     @cherrypy.expose
     def showmessages(self):
@@ -61,12 +60,20 @@ class MainApp(object):
             test = decrypt_privdata()
             send_dict = json.dumps(user_list)
             broadcasts = database.get_broadcast_messages()
+            blocked_users = cherrypy.session['temp_privdata']['blocked_usernames']
+            temp_broadcasts = []
+            for person in blocked_users:
+                for broadcast in broadcasts:
+                    if(broadcast['loginserver_record'] == person):
+                        temp_broadcasts.append(broadcast)
+            broadcasts = [x for x in broadcasts if x not in temp_broadcasts]
             template = env.get_template('broadcastmessage.html')
             htmldict = render_template(template, user_list, broadcasts)
             dict_html = {"data" : htmldict}
             dict_dump = json.dumps(dict_html)
             return dict_dump
 
+    #Funtion to interface with JS to dynamically refresh page
     @cherrypy.tools.json_out()
     @cherrypy.expose
     def showusers(self):
@@ -79,6 +86,7 @@ class MainApp(object):
 
         return dict_dump
 
+    #Funtion to interface with JS to dynamically refresh page
     @cherrypy.tools.json_out()
     @cherrypy.expose
     def poll(self):
@@ -95,6 +103,7 @@ class MainApp(object):
         print(ip)
         return dict_dump
 
+    #Funtion to interface with JS to dynamically refresh page
     @cherrypy.tools.json_out()
     @cherrypy.expose
     def showpms(self):
@@ -124,7 +133,23 @@ class MainApp(object):
             report(cherrypy.session['username'],cherrypy.session['password'])
             test = decrypt_privdata()
             send_dict = json.dumps(user_list)
+            #get current private data
+            private_data = get_privatedata(cherrypy.session['username'], cherrypy.session['password'])
+            private_data_dict = private_data['privatedata']
+            cherrypy.session['encrypted_priv']=private_data_dict
+            private_data_dict = decrypt_privdata()
+            print(private_data_dict)
+            private_data_dict = json.loads(private_data_dict.decode('utf-8'))
+            cherrypy.session['temp_privdata'] = private_data_dict
+            #show broadcasts
             broadcasts = database.get_broadcast_messages()
+            blocked_users = cherrypy.session['temp_privdata']['blocked_usernames']
+            temp_broadcasts = []
+            for person in blocked_users:
+                for broadcast in broadcasts:
+                    if(broadcast['loginserver_record'] == person):
+                        temp_broadcasts.append(broadcast)
+            broadcasts = [x for x in broadcasts if x not in temp_broadcasts]
             template = env.get_template('login.html')
             filter_list = []
             if(cherrypy.session['filter'] == "on"):
@@ -134,7 +159,7 @@ class MainApp(object):
             htmldict = render_templates(template, user_list, broadcasts,filter_list)
             Page = pageHTML
    
-       
+
             Page += htmldict
 
             return Page
@@ -143,18 +168,23 @@ class MainApp(object):
 
 
         except KeyError: #There is no username
+            cherrypy.session['login_success'] = "fail"
+
             Page +='''<div class="login-page">
                     <div class="form">
                         <button onclick="window.location.href = '/login';">login</button>
                         </form>
                         </div>
                     </div>'''
+
             
             return Page
-        
+
+    #Broadcast page where user can enter a message    
     @cherrypy.expose
     def broadcast_box(self):
-
+        if (cherrypy.session['login_success'] == "fail"):
+            raise cherrypy.HTTPRedirect('/default')
         try:
             template = env.get_template('broadcastbox.html')
             htmld = single_render(template)
@@ -165,8 +195,11 @@ class MainApp(object):
             Page = startHTML + "You have not logged in, please login!<br/>"
 
         return Page
+    #parses the broadcast information and broadcasts to cohort
     @cherrypy.expose
     def get_broadcast(self, broadcast = None):
+        if (cherrypy.session['login_success'] == "fail"):
+            raise cherrypy.HTTPRedirect('/default')
         try:
             Page = startHTML + "Successfully broadcast a message<br/>"
             cherrypy.session['broadcast'] = broadcast
@@ -177,7 +210,7 @@ class MainApp(object):
             message_bytes = bytes(record + cherrypy.session['broadcast'] + str(ts), encoding='utf-8')
             signed = cherrypy.session['signing_key'].sign(message_bytes, encoder=nacl.encoding.HexEncoder)
             signature_hex_str = signed.signature.decode('utf-8')
-
+            #threading to support a faster broadcast as parallel threads run faster
             for user in poll:
                 ip = user['connection_address'] 
                 thread = threading.Thread(target=send_broadcast, args=(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['broadcast'],ip,record,signature_hex_str))
@@ -187,11 +220,16 @@ class MainApp(object):
             Page += "Click here to return to the title <a href='/'>page</a>."
 
         except KeyError:
-            Page = startHTML + "Oops something went wrong<br/>"
+            Page = startHTML 
+            template = env.get_template('default.html')
+            htmld = single_render(template)
+            Page += htmld
         return Page
-
+    #Middleman page
     @cherrypy.expose
     def receiver_box(self):
+        if (cherrypy.session['login_success'] == "fail"):
+            raise cherrypy.HTTPRedirect('/default')
         try:
             
             template = env.get_template('receivebox.html')
@@ -203,9 +241,11 @@ class MainApp(object):
             Page = startHTML + "You have not logged in, please login!<br/>"
 
         return Page  
-
+    #page for privatemessage
     @cherrypy.expose
     def privatemessage_box(self, Username = None):
+        if (cherrypy.session['login_success'] == "fail"):
+            raise cherrypy.HTTPRedirect('/default')
         try:
             Page = pmHTML
             cherrypy.session['private_username'] = Username
@@ -241,11 +281,16 @@ class MainApp(object):
                 
 
         except KeyError:
-            Page = startHTML + "Oops something went wrong<br/>"
+            Page = startHTML
+            template = env.get_template('default.html')
+            htmld = single_render(template)
+            Page += htmld
         return Page
-
+    #pasring the private message data and sending it to the end user
     @cherrypy.expose
     def send_privatemessage(self, Message = None):
+        if (cherrypy.session['login_success'] == "fail"):
+            raise cherrypy.HTTPRedirect('/default')
         try:
             cherrypy.session['message'] = Message
             send_privatemessage(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['message'])
@@ -258,12 +303,16 @@ class MainApp(object):
             database.addtoDB_sentpms(payload)
             raise cherrypy.HTTPRedirect('/privatemessage_box?Username=' + cherrypy.session['private_username'])
         except KeyError:
-            Page = startHTML + "Oops something went wrong<br/>"
+            Page = startHTML
+            template = env.get_template('default.html')
+            htmld = single_render(template)
+            Page += htmld
         return Page
 
-
+    #login page
     @cherrypy.expose
     def login(self, bad_attempt = 0, *vars, **kwargs):
+        cherrypy.session['login_success'] = "fail"
         cherrypy.session['filter'] = "off"
         Page = startHTML 
         cherrypy.session['block_broadcasts'] = []
@@ -276,10 +325,10 @@ class MainApp(object):
         htmld = single_render(template)
         Page += htmld
 
-
+        
         
         return Page
-    
+    #UNUSED
     @cherrypy.expose    
     def sum(self, a=0, b=0): #All inputs are strings by default
         output = int(a)+int(b)
@@ -306,16 +355,19 @@ class MainApp(object):
             check_key(username, password)
             response = ping(username, password)
             if(response["response"] == "ok" and cherrypy.session['failflag'] == "pass"):
+                cherrypy.session['login_success'] = "success"      
                 cherrypy.session['status'] = "online"
                 report(username, password)
                 
                 get_record(username,password)
             else:
-                raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
+                raise cherrypy.HTTPRedirect('/login?bad_attempt=1')      
+
+            cherrypy.session['login_success'] = "success"          
             raise cherrypy.HTTPRedirect('/')
         else:
             raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
-
+    #signout of the client reporting offline status
     @cherrypy.expose
     def signout(self):
         """Logs the current user out, expires their session"""
@@ -327,30 +379,56 @@ class MainApp(object):
         else:
             cherrypy.lib.sessions.expire()
         raise cherrypy.HTTPRedirect('/')
-
+    #Change the next report status to "away"
     @cherrypy.expose
     def away(self):
         cherrypy.session['status'] = "away"
         raise cherrypy.HTTPRedirect('/')
 
+    #Change the next report status to "online"
     @cherrypy.expose
     def online(self):
         cherrypy.session['status'] = "online"
         raise cherrypy.HTTPRedirect('/')
 
+    #Parse information about who to filter messages from
     @cherrypy.expose
     def block_user(self, Message = None):
-        print(Message)
         person = Message
         cherrypy.session['temp_person'] = person
         print(cherrypy.session['temp_person'])
         cherrypy.session['filter'] = "on"
         raise cherrypy.HTTPRedirect('/')
 
+    #Parse information about who to block
+    @cherrypy.expose
+    def block(self):
+        try:
+            Page =  pageHTML
+            template = env.get_template('blockpage.html')
+            htmld = single_render(template)
+            Page += htmld
+            return Page
+        except KeyError:
+            raise cherrypy.HTTPRedirect('/default')
+
+    #Parse information about what to add to private data end point
+    @cherrypy.expose
+    def addto_privatedata(self, Message = None):
+        try:
+            cherrypy.session['temp_privdata']['blocked_usernames'].append(Message)
+            add_blockdata(cherrypy.session['username'],cherrypy.session['password'],cherrypy.session['password2'],cherrypy.session['temp_privdata'])
+            raise cherrypy.HTTPRedirect('/')
+
+        except KeyError:
+            raise cherrypy.HTTPRedirect('/default')
+
 
 ###
 ### Functions only after here
 ###
+
+#create a new key pair for user if they request one
 def pubAuth():
     username = cherrypy.session['username']   
     password = cherrypy.session['password'] #
@@ -398,11 +476,6 @@ def pubAuth():
     }
     payload = json.dumps(payload).encode('utf-8')
 
-#STUDENT TO COMPLETE:
-#1. convert the payload into json representation, 
-#2. ensure the payload is in bytes, not a string
-
-#3. pass the payload bytes into this function
     try:
         req = urllib.request.Request(url, data=payload, headers=headers)
         response = urllib.request.urlopen(req)
@@ -425,7 +498,7 @@ def pubAuth():
         return 1
 
         
-
+#Return a flag for user successfully logging in
 def authoriseUserLogin(username, password):
     print("Log on attempt from {0}:{1}".format(username, password))
     try:
@@ -439,7 +512,7 @@ def authoriseUserLogin(username, password):
     except KeyError:
         return 1
 
-
+#ping the login server with current username and password
 def ping(username, password):
 
     url = "http://cs302.kiwi.land/api/ping"   
@@ -464,11 +537,12 @@ def ping(username, password):
         data = response.read() # read the received bytes
         encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
         response.close()
+            
+        JSON_object = json.loads(data.decode(encoding))
+        print(JSON_object)
     except urllib.error.HTTPError as error:
         print(error.read())
 
-    JSON_object = json.loads(data.decode(encoding))
-    print(JSON_object)
     if (JSON_object["response"] == "ok"):
         print("Ping success")
         return JSON_object
@@ -476,7 +550,7 @@ def ping(username, password):
         print ("Fail")
         return JSON_object
 
-
+#get private data for the current user.
 def get_privatedata(username, password):
 
     url = "http://cs302.kiwi.land/api/get_privatedata"
@@ -501,7 +575,7 @@ def get_privatedata(username, password):
         raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
 
 
-
+#report the current status of the user to the login server
 def report(username, password):
     url = "http://cs302.kiwi.land/api/report"
     credentials = ('%s:%s' % (username, password))
@@ -510,10 +584,10 @@ def report(username, password):
         'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
         'Content-Type' : 'application/json; charset=utf-8',
     }
-    #cherrypy.session['external_ip']
+    #cherrypy.session['local_ip']
     payload = {
         "incoming_pubkey" : cherrypy.session['pubkey'],
-        "connection_address" : cherrypy.session['local_ip'],
+        "connection_address" : cherrypy.session['external_ip'],
         "connection_location" : 2,
         "status" : cherrypy.session['status']
         
@@ -525,13 +599,15 @@ def report(username, password):
         data = response.read() # read the received bytes
         encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
         response.close()
+        
+        JSON_object = json.loads(data.decode(encoding))
+        print(JSON_object)
+        return JSON_object
+
     except urllib.error.HTTPError as error:
         print(error.read())
 
-    JSON_object = json.loads(data.decode(encoding))
-    print(JSON_object)
-    return JSON_object
-
+#check the current private key as a login measure
 def check_key(username, password):
     try:
         private_data = get_privatedata(username, password)
@@ -540,7 +616,7 @@ def check_key(username, password):
         private_data_dict = decrypt_privdata()
         print(private_data_dict)
         private_data_dict = json.loads(private_data_dict.decode('utf-8'))
-        print(private_data_dict)
+        cherrypy.session['temp_privdata'] = private_data_dict
         if (private_data_dict['prikeys'][0] == ""):
             pubAuth()
             cherrypy.session['privatekey'] = private_data_dict['prikeys'][0]
@@ -575,7 +651,7 @@ def check_key(username, password):
     except TypeError: 
         raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
 
-
+#send a broadcast to a specified person
 def send_broadcast(username,password,message,ip,record,signature_hex_str):
 
     url = "http://"+ip+"/api/rx_broadcast"
@@ -614,7 +690,8 @@ def send_broadcast(username,password,message,ip,record,signature_hex_str):
         response.close()
     except (urllib.error.HTTPError,urllib.error.URLError,json.decoder.JSONDecodeError) as error:
         return
-    
+
+#send a broadcast to the login server   
 def send_broadcast_login(username,password,message):
     url = "http://cs302.kiwi.land/api/rx_broadcast"
     # Generate a new random signing key 
@@ -652,7 +729,7 @@ def send_broadcast_login(username,password,message):
     except (urllib.error.HTTPError,urllib.error.URLError,json.decoder.JSONDecodeError) as error:
         return
     
-
+#get the loginserver record of the person
 def get_record(username, password):
     url = "http://cs302.kiwi.land/api/get_loginserver_record"
  
@@ -668,12 +745,13 @@ def get_record(username, password):
         data = response.read() # read the received bytes
         encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
         response.close()
+        JSON_object = json.loads(data.decode(encoding))
+        cherrypy.session['loginserver_record'] = JSON_object['loginserver_record']
     except urllib.error.HTTPError as error:
         print(error.read())
 
-    JSON_object = json.loads(data.decode(encoding))
-    cherrypy.session['loginserver_record'] = JSON_object['loginserver_record']
-    
+
+#Calls the list_users api to get everyone who is online    
 def list_users(username, password):
     url = "http://cs302.kiwi.land/api/list_users"
  
@@ -689,13 +767,14 @@ def list_users(username, password):
         data = response.read() # read the received bytes
         encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
         response.close()
+        JSON_object = json.loads(data.decode(encoding))
+
+        return JSON_object['users']
     except urllib.error.HTTPError as error:
         print(error.read())
 
-    JSON_object = json.loads(data.decode(encoding))
 
-    return JSON_object['users']
-
+#send a private message to the specified person
 def send_privatemessage(username, password, message):
 
         
@@ -711,8 +790,7 @@ def send_privatemessage(username, password, message):
                 if(cherrypy.session['private_username'] == "admin"):
                     thisip = "cs302.kiwi.land"
                     
-                print("PM IP IS")
-                print(thisip)
+
         url = "http://"+thisip+"/api/rx_privatemessage"
         message = bytes(cherrypy.session['message'], 'utf-8')
         verifykey = nacl.signing.VerifyKey(target_pubkey_bytes, encoder=nacl.encoding.HexEncoder)
@@ -753,10 +831,14 @@ def send_privatemessage(username, password, message):
             
             JSON_object = json.loads(data.decode(encoding))
             print(JSON_object)
-        except urllib.error.HTTPError as error:
-            print(error.read())
+        except urllib.error.HTTPError:
+            cherrypy.HTTPRedirect('/index')
+        except TimeoutError:
+            cherrypy.HTTPRedirect('/index')
+        except urllib.error.URLError:
+            cherrypy.HTTPRedirect('/index')
 
-
+#Function to add private data for a specified person
 def add_privdata(username, password, password2):
     
     ts = str(time.time())
@@ -826,7 +908,62 @@ def add_privdata(username, password, password2):
     JSON_object = json.loads(data.decode(encoding))
     print(JSON_object)
 
+#Function to add a person to someone's blocklist. Peoeple on the blocklist will not have their broadcasts seen
+def add_blockdata(username, password, password2, private_datas):
+    
+    ts = str(time.time())
 
+    
+    private_data = json.dumps(private_datas)
+    password2 = bytes(password2, 'utf-8')
+    #create a secret box 
+    kdf = nacl.pwhash.argon2i.kdf # our key derivation function
+    ops = nacl.pwhash.argon2i.OPSLIMIT_SENSITIVE
+    mem = nacl.pwhash.argon2i.MEMLIMIT_SENSITIVE
+    salt_bytes = password2 * 16 
+    salt = salt_bytes[0:16]
+    key = kdf(nacl.secret.SecretBox.KEY_SIZE, password2, salt,ops,mem)
+    box = nacl.secret.SecretBox(key)
+    #create a unique nonce and encrypt our private data
+
+    nonce = nacl.utils.random(nacl.secret.SecretBox.NONCE_SIZE) 
+    encrypted = box.encrypt(bytes(private_data,'utf-8'),nonce)
+    data = base64.b64encode(encrypted).decode("utf-8")
+
+    url = "http://cs302.kiwi.land/api/add_privatedata"
+    message_bytes = bytes(data + cherrypy.session['loginserver_record'] + ts, encoding='utf-8')
+    print(cherrypy.session['privatekey'])
+    signed = cherrypy.session['signing_key'].sign(message_bytes, encoder=nacl.encoding.HexEncoder)
+    signature_hex_str = signed.signature.decode('utf-8')
+
+    credentials = ('%s:%s' % (username, password))
+    b64_credentials = base64.b64encode(credentials.encode('ascii'))
+    headers = {
+        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
+        'Content-Type' : 'application/json; charset=utf-8',
+    }
+
+    payload = {
+        "privatedata" : data,
+        "client_saved_at" : ts,
+        "loginserver_record" : cherrypy.session['loginserver_record'],
+        "signature" : signature_hex_str
+    }
+    payload = json.dumps(payload).encode('utf-8')
+    try:
+        req = urllib.request.Request(url, data=payload, headers=headers)
+        response = urllib.request.urlopen(req)
+        data = response.read() # read the received bytes
+        encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
+        response.close()
+    except urllib.error.HTTPError as error:
+        print(error.read())
+
+    JSON_object = json.loads(data.decode(encoding))
+    print(JSON_object)
+
+
+#Function to try and decrypt private data using a secret box and an encryption password set by the encryptor of the data
 def decrypt_privdata():
     try:
         password_bytes = bytes(cherrypy.session['password2'], 'utf-8')
@@ -848,7 +985,8 @@ def decrypt_privdata():
         raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
         cherrypy.session['failflag'] = "fail"
         cherrypy.lib.sessions.expire()
-        
+
+#Function to call the ping_check api that regularly checks the health of the server's that are visible to you
 def ping_check(username, password,ip,curr_ip):
     url = "http://" + ip + "/api/ping_check"
     credentials = ('%s:%s' % (username, password))
@@ -875,7 +1013,9 @@ def ping_check(username, password,ip,curr_ip):
     except (urllib.error.HTTPError,urllib.error.URLError,json.decoder.JSONDecodeError) as error:
         return
 
-
+#------------------------------------------------------------------
+#JINJA TEMPLATE RENDERING FUNCTIONS FOR DIFFERENT INPUTS
+#------------------------------------------------------------------
 def render_template(template, list_user, message_list):
     return template.render(user_list=list_user, message_list = message_list)
 
@@ -891,6 +1031,7 @@ def render_template_user(template, list_user):
 def single_render(template):
     return template.render()
 
+#Contact an online API to return your external ip. Not used at university but will be used at home for testing purposes
 def get_ownip():
     try:
         url = "https://api.ipify.org/?format=json"
