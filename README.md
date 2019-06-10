@@ -6,6 +6,8 @@ Hi! Welcome to my Python project for Compsys 302.
 
 How to run the application on ubuntu linux:
 
+First, go into the root folder of the project, and open a terminal. To start the server run the command "python3 main.py"
+
 Since IP is already configured dynamically, all you need to do is run the server and copy the IP address that comes up in the console. EG "202.29.43.24:8000" into your web browser.
 
 Example people that this work with:
