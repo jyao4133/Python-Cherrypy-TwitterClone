@@ -76,8 +76,8 @@ ul.broadcast-style {
   flex-direction: column;
   max-width: 50%;
   list-style-type: none;    
-  margin-left: 300px;
-  margin-top: 0px;
+  margin-left: 400px;
+  margin-top: 200px;
 }
 li.broadcast-style {
   border:1px solid black;
