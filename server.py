@@ -126,7 +126,8 @@ class MainApp(object):
     @cherrypy.expose
     def index(self):    
         Page = startHTML
-        cherrypy.session['external_ip'] = get_ownip()+":"+"8000"
+        cherrypy.session['external_ip'] = main.get_ip_address()+":"+"10050"
+        print(cherrypy.session['external_ip'])
 
         try:
             user_list = list_users(cherrypy.session['username'],cherrypy.session['password'])
@@ -568,7 +569,7 @@ def get_privatedata(username, password):
             
         JSON_object = json.loads(data.decode(encoding))
         return JSON_object
-    except urllib.error.HTTPError as error:
+    except urllib.error.HTTPError:
         raise cherrypy.HTTPRedirect('/login?bad_attempt=1')                
 
 

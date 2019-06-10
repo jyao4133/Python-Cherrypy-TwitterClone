@@ -30,7 +30,7 @@ def get_ip_address():
     return s.getsockname()[0]
 # The address we listen for connections onw
 LISTEN_IP = get_ip_address()
-LISTEN_PORT = 8000
+LISTEN_PORT = 10050
 
 #Main application to start server and mount server 
 def runMainApp():
