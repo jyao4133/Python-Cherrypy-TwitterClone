@@ -14,11 +14,10 @@ Welcome to Tweety! (jyao413)
                         </ul></header></body></h1>
 <h2></h2>
 <div id="users">
+Online Users
 
-
-  <ul class="list-group">
-    <h2>Online Users</br></h2>
-    {% for user in user_list %}
+<ul class="list-group">
+    {% for user in user_list %weupwhypq
         <li class="list-group-item"> {{user['username']}}</li>
     {% endfor %}
 </ul>
